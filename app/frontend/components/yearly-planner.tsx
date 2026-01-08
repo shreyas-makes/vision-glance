@@ -172,6 +172,17 @@ function formatHoverDate(date: Date) {
   return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
 }
 
+function formatEventRange(event: PlannerEvent) {
+  const start = toDate(event.start)
+  const end = toDate(event.end)
+  const startMonth = monthNames[start.getMonth()].slice(0, 3)
+  const endMonth = monthNames[end.getMonth()].slice(0, 3)
+  if (start.getMonth() === end.getMonth()) {
+    return `${startMonth} ${start.getDate()}–${end.getDate()}`
+  }
+  return `${startMonth} ${start.getDate()}–${endMonth} ${end.getDate()}`
+}
+
 export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null)
   const [visionHover, setVisionHover] = useState<{
@@ -276,7 +287,10 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
             </div>
           ) : (
             <p className="mt-2 text-xs text-slate-500">
-              Hover any date to surface its events.
+              <span className="sm:hidden">Tap any date to surface its events.</span>
+              <span className="hidden sm:inline">
+                Hover any date to surface its events.
+              </span>
             </p>
           )}
         </div>
@@ -285,6 +299,13 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
       <div className="relative z-10 mt-8 space-y-4">
         {months.map((month) => {
           const segments = getMonthSegments(year, month.index, sampleEvents)
+          const monthStart = new Date(year, month.index, 1)
+          const monthEnd = new Date(year, month.index, month.days)
+          const monthEvents = sampleEvents.filter((event) => {
+            const start = toDate(event.start)
+            const end = toDate(event.end)
+            return end >= monthStart && start <= monthEnd
+          })
           const isActiveTooltip = visionHover?.monthIndex === month.index
           return (
             <div
@@ -296,7 +317,120 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                 setVisionHover(null)
               }}
             >
-              <div className="flex items-center gap-4">
+              <div className="sm:hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p
+                      className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                    >
+                      {month.name}
+                    </p>
+                    <p className="text-xs text-slate-400">{month.days} days</p>
+                  </div>
+                  <div className="rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] text-slate-500">
+                    {monthEvents.length} events
+                  </div>
+                </div>
+
+                <div className="mt-3 overflow-x-auto pb-2">
+                  <div className="min-w-max space-y-2">
+                    <div className="grid grid-cols-[repeat(31,48px)] gap-2">
+                      {segments.map((segment, index) => (
+                        <div
+                          key={`${segment.id}-mobile-${index}`}
+                          className={`col-span-1 row-span-1 flex items-center rounded-full px-2 text-[11px] font-medium shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)] ${toneStyles[segment.tone]}`}
+                          style={{
+                            gridColumn: `${segment.startDay} / span ${
+                              segment.endDay - segment.startDay + 1
+                            }`,
+                          }}
+                        >
+                          <span className="truncate">{segment.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-[repeat(31,48px)] gap-2">
+                      {Array.from({ length: 31 }, (_, dayIndex) => {
+                        const dayNumber = dayIndex + 1
+                        const isActive = dayNumber <= month.days
+                        const dayDate = new Date(
+                          year,
+                          month.index,
+                          dayNumber,
+                        )
+                        const dayOfWeek = dayDate.getDay()
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+                        return (
+                          <button
+                            key={`${month.name}-mobile-${dayNumber}`}
+                            type="button"
+                            disabled={!isActive}
+                            onMouseEnter={() => isActive && handleHover(dayDate)}
+                            onClick={() => isActive && handleHover(dayDate)}
+                            aria-label={`${month.name} ${dayNumber}, ${year}`}
+                            className={[
+                              "relative h-12 rounded-xl border border-transparent px-2 text-left text-xs transition",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70",
+                              isActive
+                                ? "bg-white text-slate-800 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.8)] hover:bg-slate-900 hover:text-white"
+                                : "bg-slate-100/70 text-slate-300",
+                              isActive && isWeekend
+                                ? "bg-slate-50 text-slate-700"
+                                : "",
+                            ].join(" ")}
+                          >
+                            {isActive && (
+                              <>
+                                <span
+                                  className="block text-[10px] text-slate-400"
+                                  style={{
+                                    fontFamily:
+                                      "'JetBrains Mono', monospace",
+                                  }}
+                                >
+                                  {weekdayShort[dayOfWeek]}
+                                </span>
+                                <span
+                                  className="text-sm font-semibold"
+                                  style={{
+                                    fontFamily:
+                                      "'JetBrains Mono', monospace",
+                                  }}
+                                >
+                                  {dayNumber}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                  {monthEvents.map((event) => (
+                    <div
+                      key={`${event.id}-mobile-pill`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
+                    >
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
+                      />
+                      <span className="font-semibold text-slate-800">
+                        {event.label}
+                      </span>
+                      <span className="text-slate-500">
+                        {formatEventRange(event)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="hidden items-center gap-4 sm:flex">
                 <div className="w-20 shrink-0">
                   <p
                     className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500"
@@ -355,6 +489,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                           type="button"
                           disabled={!isActive}
                           onMouseEnter={() => isActive && handleHover(dayDate)}
+                          onClick={() => isActive && handleHover(dayDate)}
                           aria-label={`${month.name} ${dayNumber}, ${year}`}
                           className={[
                             "relative h-9 rounded-md border border-transparent px-1 text-left text-[10px] transition",
