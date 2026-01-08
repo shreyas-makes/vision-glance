@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 type PlannerEvent = {
   id: string
@@ -6,6 +6,7 @@ type PlannerEvent = {
   start: string
   end: string
   tone: "sea" | "sunset" | "orchid" | "ink"
+  createdAt?: number
 }
 
 type VisionEvent = PlannerEvent & {
@@ -48,6 +49,8 @@ const toneStyles: Record<PlannerEvent["tone"], string> = {
   orchid: "bg-[#8a4b87] text-white/95",
   ink: "bg-[#1f2937] text-white/95",
 }
+
+const toneOrder: PlannerEvent["tone"][] = ["sea", "sunset", "orchid", "ink"]
 
 const createPolaroidImage = (label: string, hue: number) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
@@ -121,10 +124,6 @@ const sampleEvents: VisionEvent[] = [
   },
 ]
 
-function getDaysInMonth(year: number, monthIndex: number) {
-  return new Date(year, monthIndex + 1, 0).getDate()
-}
-
 function toDate(value: string) {
   const [year, month, day] = value.split("-").map(Number)
   return new Date(year, month - 1, day)
@@ -137,35 +136,30 @@ function isDateInRange(date: Date, start: Date, end: Date) {
   return dateValue >= startValue && dateValue <= endValue
 }
 
-function getMonthSegments(
-  year: number,
-  monthIndex: number,
-  events: PlannerEvent[],
-): EventSegment[] {
-  const daysInMonth = getDaysInMonth(year, monthIndex)
-  return events
-    .map((event) => {
-      const start = toDate(event.start)
-      const end = toDate(event.end)
-      const monthStart = new Date(year, monthIndex, 1)
-      const monthEnd = new Date(year, monthIndex, daysInMonth)
+function isDateWithinRange(date: Date, start: Date, end: Date) {
+  const dateValue = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime()
+  const startValue = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  ).getTime()
+  const endValue = new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate(),
+  ).getTime()
+  return (
+    dateValue >= Math.min(startValue, endValue) &&
+    dateValue <= Math.max(startValue, endValue)
+  )
+}
 
-      if (end < monthStart || start > monthEnd) {
-        return null
-      }
-
-      const startDay = start < monthStart ? 1 : start.getDate()
-      const endDay = end > monthEnd ? daysInMonth : end.getDate()
-
-      return {
-        id: event.id,
-        label: event.label,
-        startDay,
-        endDay,
-        tone: event.tone,
-      }
-    })
-    .filter((segment): segment is EventSegment => Boolean(segment))
+function isLeapYear(year: number) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
 function formatHoverDate(date: Date) {
@@ -183,60 +177,328 @@ function formatEventRange(event: PlannerEvent) {
   return `${startMonth} ${start.getDate()}–${endMonth} ${end.getDate()}`
 }
 
+function getDayOfYear(date: Date) {
+  const startOfYear = new Date(date.getFullYear(), 0, 1)
+  const diff = date.getTime() - startOfYear.getTime()
+  return Math.floor(diff / 86400000) + 1
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, "0")
+  const day = `${date.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
+  const [activeYear, setActiveYear] = useState(year)
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null)
-  const [visionHover, setVisionHover] = useState<{
-    event: VisionEvent
-    monthIndex: number
-    left: number
-    top: number
-  } | null>(null)
+  const [jumpDate, setJumpDate] = useState("")
+  const [flashDateKey, setFlashDateKey] = useState<string | null>(null)
+  const [gridColumns, setGridColumns] = useState(7)
+  const [gridCellSize, setGridCellSize] = useState(56)
+  const [addMode, setAddMode] = useState(false)
+  const [rangeStart, setRangeStart] = useState<Date | null>(null)
+  const [rangeEnd, setRangeEnd] = useState<Date | null>(null)
+  const [events, setEvents] = useState<PlannerEvent[]>(sampleEvents)
+  const yearGridRef = useRef<HTMLDivElement | null>(null)
 
   const eventDates = useMemo(() => {
-    return sampleEvents.map((event) => ({
+    return events.map((event) => ({
       ...event,
       startDate: toDate(event.start),
       endDate: toDate(event.end),
     }))
+  }, [events])
+
+  useEffect(() => {
+    setActiveYear(year)
+  }, [year])
+
+  useEffect(() => {
+    if (!flashDateKey) return
+    const timeout = window.setTimeout(() => {
+      setFlashDateKey(null)
+    }, 1600)
+    return () => window.clearTimeout(timeout)
+  }, [flashDateKey])
+
+  useEffect(() => {
+    const container = yearGridRef.current
+    if (!container || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width ?? 0
+      const minWeekWidth = 66 * 7
+      const weekGroups = Math.max(1, Math.floor(width / minWeekWidth))
+      const columns = weekGroups * 7
+      const rawCell = width > 0 ? width / columns : 56
+      const clampedCell = Math.max(44, Math.min(70, Math.floor(rawCell)))
+      setGridColumns(columns)
+      setGridCellSize(clampedCell)
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      ) {
+        return
+      }
+      if (event.key === "ArrowLeft") {
+        setActiveYear((prev) => prev - 1)
+      }
+      if (event.key === "ArrowRight") {
+        setActiveYear((prev) => prev + 1)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
+
+  const spannedEvents = useMemo(() => eventDates, [eventDates])
+
+  const daysInYear = useMemo(
+    () => (isLeapYear(activeYear) ? 366 : 365),
+    [activeYear],
+  )
+
+  const yearStart = useMemo(() => new Date(activeYear, 0, 1), [activeYear])
+  const yearStartOffset = useMemo(() => yearStart.getDay(), [yearStart])
+  const totalCells = useMemo(
+    () => yearStartOffset + daysInYear,
+    [daysInYear, yearStartOffset],
+  )
+  const trailingCells = useMemo(
+    () => (gridColumns - (totalCells % gridColumns)) % gridColumns,
+    [gridColumns, totalCells],
+  )
+  const gridCells = useMemo(
+    () => totalCells + trailingCells,
+    [totalCells, trailingCells],
+  )
+  const weekRows = useMemo(
+    () => Math.ceil(gridCells / gridColumns),
+    [gridCells, gridColumns],
+  )
+
+  const yearGrid = useMemo(() => {
+    return Array.from({ length: gridCells }, (_, index) => {
+      const dayOfYear = index - yearStartOffset + 1
+      if (dayOfYear < 1 || dayOfYear > daysInYear) {
+        return null
+      }
+      const date = new Date(activeYear, 0, dayOfYear)
+      return {
+        date,
+        dayNumber: date.getDate(),
+        monthIndex: date.getMonth(),
+        isMonthStart: date.getDate() === 1,
+        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      }
+    })
+  }, [daysInYear, gridCells, activeYear, yearStartOffset])
+
+  const yearWeekSegments = useMemo(() => {
+    const yearEnd = new Date(activeYear, 11, 31)
+    const rawSegments = spannedEvents
+      .map((event) => {
+        if (event.endDate < yearStart || event.startDate > yearEnd) {
+          return null
+        }
+        const startDate = event.startDate < yearStart ? yearStart : event.startDate
+        const endDate = event.endDate > yearEnd ? yearEnd : event.endDate
+        const startDay = getDayOfYear(startDate)
+        const endDay = getDayOfYear(endDate)
+        const startIndex = yearStartOffset + startDay - 1
+        const endIndex = yearStartOffset + endDay - 1
+        const segments: Array<
+          EventSegment & {
+            row: number
+            colStart: number
+            span: number
+            colEnd: number
+            createdAt: number
+          }
+        > = []
+        let currentIndex = startIndex
+        while (currentIndex <= endIndex) {
+          const row = Math.floor(currentIndex / gridColumns)
+          const rowEnd = row * gridColumns + (gridColumns - 1)
+          const segmentEnd = Math.min(endIndex, rowEnd)
+          const span = segmentEnd - currentIndex + 1
+          const colStart = (currentIndex % gridColumns) + 1
+          const colEnd = colStart + span - 1
+          segments.push({
+            id: event.id,
+            label: event.label,
+            tone: event.tone,
+            startDay,
+            endDay,
+            row: row + 1,
+            colStart,
+            span,
+            colEnd,
+            createdAt: event.createdAt ?? 0,
+          })
+          currentIndex = segmentEnd + 1
+        }
+        return segments
+      })
+      .flat()
+      .filter(
+        (
+          segment,
+        ): segment is EventSegment & {
+          row: number
+          colStart: number
+          span: number
+          colEnd: number
+          createdAt: number
+        } => Boolean(segment),
+      )
+
+    const segmentsByRow = new Map<number, number[]>()
+    const stackedSegments = rawSegments
+      .sort((a, b) => {
+        if (a.row !== b.row) return a.row - b.row
+        if (a.colStart !== b.colStart) return a.colStart - b.colStart
+        return b.createdAt - a.createdAt
+      })
+      .map((segment) => {
+        const existing = segmentsByRow.get(segment.row) ?? []
+        let stackIndex = existing.findIndex((end) => segment.colStart > end)
+        if (stackIndex === -1) {
+          stackIndex = existing.length
+          existing.push(segment.colEnd)
+        } else {
+          existing[stackIndex] = segment.colEnd
+        }
+        segmentsByRow.set(segment.row, existing)
+        return { ...segment, stackIndex }
+      })
+
+    const maxStackByRow = Array.from({ length: weekRows }, (_, index) => {
+      const stacks = segmentsByRow.get(index + 1)
+      return stacks ? stacks.length : 0
+    })
+
+    return { segments: stackedSegments, maxStackByRow }
+  }, [
+    activeYear,
+    gridColumns,
+    spannedEvents,
+    yearStart,
+    yearStartOffset,
+    daysInYear,
+    weekRows,
+  ])
+
+  const yearDayIds = useMemo(
+    () =>
+      yearGrid
+        .filter((day) => Boolean(day))
+        .map((day) => `year-day-${formatDateKey((day as { date: Date }).date)}`),
+    [yearGrid],
+  )
+
+  const yearEventRowHeight = 34
+  const yearEventRowGap = 8
+
+  const maxEventStack = useMemo(
+    () => Math.max(0, ...yearWeekSegments.maxStackByRow),
+    [yearWeekSegments.maxStackByRow],
+  )
+
+  const yearEventOffset =
+    maxEventStack > 0
+      ? maxEventStack * yearEventRowHeight +
+        (maxEventStack - 1) * yearEventRowGap +
+        6
+      : 0
+  const dayOverlayTop = yearEventOffset + 6
+
+  const weekRowHeights = useMemo(() => {
+    const rowHeight = gridCellSize + yearEventOffset
+    return Array.from({ length: weekRows }, () => `${rowHeight}px`)
+  }, [gridCellSize, weekRows, yearEventOffset])
+
   const handleHover = (date: Date) => {
-    const matching = eventDates.filter((event) =>
+    const matching = spannedEvents.filter((event) =>
       isDateInRange(date, event.startDate, event.endDate),
     )
     setHoverInfo({ date, events: matching })
   }
 
-  const handleVisionHover = (
-    event: VisionEvent,
-    monthIndex: number,
-    element: HTMLDivElement | null,
-  ) => {
-    if (!element) return
-    const container = element.closest("[data-month-row]")
-    if (!container) return
-    const containerRect = container.getBoundingClientRect()
-    const targetRect = element.getBoundingClientRect()
-    const tooltipWidth = 200
-    const padding = 16
-    const rawLeft =
-      targetRect.left - containerRect.left + targetRect.width / 2
-    const left = Math.min(
-      Math.max(rawLeft, padding + tooltipWidth / 2),
-      containerRect.width - padding - tooltipWidth / 2,
-    )
-    const top = targetRect.top - containerRect.top
-    setVisionHover({ event, monthIndex, left, top })
+  const handleAddToggle = () => {
+    setAddMode((prev) => {
+      if (prev) {
+        setRangeStart(null)
+        setRangeEnd(null)
+      }
+      return !prev
+    })
   }
 
-  const months = useMemo(
+  const handleRangeClick = (date: Date) => {
+    if (!addMode) return
+    if (!rangeStart) {
+      setRangeStart(date)
+      setRangeEnd(date)
+      return
+    }
+    const start =
+      date.getTime() < rangeStart.getTime() ? date : rangeStart
+    const end = date.getTime() < rangeStart.getTime() ? rangeStart : date
+    const createdAt = Date.now()
+    const tone = toneOrder[events.length % toneOrder.length]
+    setEvents((prev) => [
+      ...prev,
+      {
+        id: `event-${createdAt}`,
+        label: "New event",
+        start: formatDateKey(start),
+        end: formatDateKey(end),
+        tone,
+        createdAt,
+      },
+    ])
+    setRangeStart(null)
+    setRangeEnd(null)
+  }
+
+  const handleDaySelect = (date: Date) => {
+    const key = formatDateKey(date)
+    setJumpDate(key)
+    setFlashDateKey(key)
+  }
+
+  const handleJump = (value: string) => {
+    if (!value) return
+    const [yearValue, monthValue, dayValue] = value.split("-").map(Number)
+    if (!yearValue || !monthValue || !dayValue) return
+    const nextDate = new Date(yearValue, monthValue - 1, dayValue)
+    setActiveYear(nextDate.getFullYear())
+    setFlashDateKey(formatDateKey(nextDate))
+    window.requestAnimationFrame(() => {
+      const target =
+        document.getElementById(`year-day-${formatDateKey(nextDate)}`) ||
+        document.getElementById(`day-${formatDateKey(nextDate)}`)
+      target?.scrollIntoView({ block: "center", behavior: "smooth" })
+    })
+  }
+
+  const weekdayLabels = useMemo(
     () =>
-      monthNames.map((name, index) => ({
-        name,
-        index,
-        days: getDaysInMonth(year, index),
-      })),
-    [year],
+      Array.from({ length: gridColumns }, (_, index) => weekdayShort[index % 7]),
+    [gridColumns],
   )
 
   return (
@@ -253,7 +515,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
             className="mt-2 text-4xl font-semibold text-slate-950 sm:text-5xl"
             style={{ fontFamily: "'Fraunces', serif" }}
           >
-            {year}
+            {activeYear}
           </h1>
           <p className="mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
             A single-scan calendar for the year ahead. Hover across stretches to
@@ -261,342 +523,276 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)]">
-          <p className="text-xs font-medium uppercase tracking-[0.25em] text-slate-400">
-            Hover preview
-          </p>
-          {hoverInfo ? (
-            <div className="mt-2 space-y-2">
-              <p className="text-sm font-semibold text-slate-900">
-                {formatHoverDate(hoverInfo.date)}
-              </p>
-              {hoverInfo.events.length > 0 ? (
-                <ul className="space-y-1 text-xs text-slate-600">
-                  {hoverInfo.events.map((event) => (
-                    <li key={event.id} className="flex items-center gap-2">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
-                      />
-                      <span>{event.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-500">No events in range.</p>
-              )}
+        <div className="flex flex-col gap-3 sm:items-end">
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-xs text-slate-600 shadow-[0_16px_40px_-32px_rgba(15,23,42,0.6)]">
+            <button
+              type="button"
+              onClick={() => setActiveYear((prev) => prev - 1)}
+              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+              aria-label="Previous year"
+            >
+              Prev
+            </button>
+            <div className="rounded-full border border-slate-200/80 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
+              {activeYear}
             </div>
-          ) : (
-            <p className="mt-2 text-xs text-slate-500">
-              <span className="sm:hidden">Tap any date to surface its events.</span>
-              <span className="hidden sm:inline">
-                Hover any date to surface its events.
-              </span>
+            <button
+              type="button"
+              onClick={() => setActiveYear((prev) => prev + 1)}
+              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+              aria-label="Next year"
+            >
+              Next
+            </button>
+            <label className="sr-only" htmlFor="year-jump">
+              Jump to date
+            </label>
+            <input
+              id="year-jump"
+              type="date"
+              value={jumpDate}
+              onChange={(event) => {
+                const value = event.target.value
+                setJumpDate(value)
+                handleJump(value)
+              }}
+              className="h-8 rounded-full border border-slate-200 bg-white px-3 text-[11px] text-slate-600"
+            />
+            <span className="text-[11px] text-slate-400">
+              Use Left/Right for years
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddToggle}
+            aria-pressed={addMode}
+            className={[
+              "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+              addMode
+                ? "border-slate-900 bg-slate-900 text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)]"
+                : "border-slate-200/80 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+            ].join(" ")}
+          >
+            {addMode ? "Add mode on" : "Add"}
+          </button>
+
+          <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)]">
+            <p className="text-xs font-medium uppercase tracking-[0.25em] text-slate-400">
+              {addMode ? "Add event" : "Hover preview"}
             </p>
-          )}
+            {addMode ? (
+              <p className="mt-2 text-xs text-slate-500">
+                Click a start date, then an end date to block the range.
+              </p>
+            ) : hoverInfo ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-sm font-semibold text-slate-900">
+                  {formatHoverDate(hoverInfo.date)}
+                </p>
+                {hoverInfo.events.length > 0 ? (
+                  <ul className="space-y-1 text-xs text-slate-600">
+                    {hoverInfo.events.map((event) => (
+                      <li key={event.id} className="flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
+                        />
+                        <span>{event.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-slate-500">No events in range.</p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-slate-500">
+                <span className="sm:hidden">Tap any date to surface its events.</span>
+                <span className="hidden sm:inline">
+                  Hover any date to surface its events.
+                </span>
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="relative z-10 mt-8 space-y-4">
-        {months.map((month) => {
-          const segments = getMonthSegments(year, month.index, sampleEvents)
-          const monthStart = new Date(year, month.index, 1)
-          const monthEnd = new Date(year, month.index, month.days)
-          const monthEvents = sampleEvents.filter((event) => {
-            const start = toDate(event.start)
-            const end = toDate(event.end)
-            return end >= monthStart && start <= monthEnd
-          })
-          const isActiveTooltip = visionHover?.monthIndex === month.index
-          return (
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p
+                className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Year flow
+              </p>
+              <p className="text-xs text-slate-400">
+                {daysInYear} days · {spannedEvents.length} events
+              </p>
+            </div>
+            <div className="rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] text-slate-500">
+              Month markers at day 1
+            </div>
+          </div>
+
+          <div className="mt-3" ref={yearGridRef}>
+            <p className="sr-only" id="year-flow-label">
+              Year grid with day links. Use the jump menu to highlight dates.
+            </p>
             <div
-              key={month.name}
-              data-month-row
-              className="group relative overflow-visible rounded-2xl border border-slate-200/70 bg-white/50 px-3 py-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"
-              onMouseLeave={() => {
-                setHoverInfo(null)
-                setVisionHover(null)
+              className="grid gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400"
+              style={{
+                gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
               }}
             >
-              <div className="sm:hidden">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p
-                      className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                    >
-                      {month.name}
-                    </p>
-                    <p className="text-xs text-slate-400">{month.days} days</p>
-                  </div>
-                  <div className="rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] text-slate-500">
-                    {monthEvents.length} events
-                  </div>
+              {weekdayLabels.map((day, index) => (
+                <div key={`${day}-${index}`} className="text-center">
+                  {day}
                 </div>
+              ))}
+            </div>
 
-                <div className="mt-3 overflow-x-auto pb-2">
-                  <div className="min-w-max space-y-2">
-                    <div className="grid grid-cols-[repeat(31,48px)] gap-2">
-                      {segments.map((segment, index) => (
-                        <div
-                          key={`${segment.id}-mobile-${index}`}
-                          className={`col-span-1 row-span-1 flex items-center rounded-full px-2 text-[11px] font-medium shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)] ${toneStyles[segment.tone]}`}
-                          style={{
-                            gridColumn: `${segment.startDay} / span ${
-                              segment.endDay - segment.startDay + 1
-                            }`,
-                          }}
-                        >
-                          <span className="truncate">{segment.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-[repeat(31,48px)] gap-2">
-                      {Array.from({ length: 31 }, (_, dayIndex) => {
-                        const dayNumber = dayIndex + 1
-                        const isActive = dayNumber <= month.days
-                        const dayDate = new Date(
-                          year,
-                          month.index,
-                          dayNumber,
-                        )
-                        const dayOfWeek = dayDate.getDay()
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-                        return (
-                          <button
-                            key={`${month.name}-mobile-${dayNumber}`}
-                            type="button"
-                            disabled={!isActive}
-                            onMouseEnter={() => isActive && handleHover(dayDate)}
-                            onClick={() => isActive && handleHover(dayDate)}
-                            aria-label={`${month.name} ${dayNumber}, ${year}`}
-                            className={[
-                              "relative h-12 rounded-xl border border-transparent px-2 text-left text-xs transition",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70",
-                              isActive
-                                ? "bg-white text-slate-800 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.8)] hover:bg-slate-900 hover:text-white"
-                                : "bg-slate-100/70 text-slate-300",
-                              isActive && isWeekend
-                                ? "bg-slate-50 text-slate-700"
-                                : "",
-                            ].join(" ")}
-                          >
-                            {isActive && (
-                              <>
-                                <span
-                                  className="block text-[10px] text-slate-400"
-                                  style={{
-                                    fontFamily:
-                                      "'JetBrains Mono', monospace",
-                                  }}
-                                >
-                                  {weekdayShort[dayOfWeek]}
-                                </span>
-                                <span
-                                  className="text-sm font-semibold"
-                                  style={{
-                                    fontFamily:
-                                      "'JetBrains Mono', monospace",
-                                  }}
-                                >
-                                  {dayNumber}
-                                </span>
-                              </>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
+            <div className="relative mt-2">
+              <div
+                className="pointer-events-none absolute inset-0 z-10 grid gap-1.5"
+                style={{
+                  gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                  gridTemplateRows: weekRowHeights.join(" "),
+                }}
+              >
+                {yearWeekSegments.segments.map((segment, index) => (
+                  <div
+                    key={`${segment.id}-year-${index}`}
+                    className={`flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]}`}
+                    style={{
+                      gridRow: segment.row,
+                      gridColumn: `${segment.colStart} / span ${segment.span}`,
+                      marginTop:
+                        segment.stackIndex *
+                        (yearEventRowHeight + yearEventRowGap),
+                    }}
+                  >
+                    <span className="truncate">{segment.label}</span>
                   </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-                  {monthEvents.map((event) => (
-                    <div
-                      key={`${event.id}-mobile-pill`}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
-                    >
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
-                      />
-                      <span className="font-semibold text-slate-800">
-                        {event.label}
-                      </span>
-                      <span className="text-slate-500">
-                        {formatEventRange(event)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
 
-              <div className="hidden items-center gap-4 sm:flex">
-                <div className="w-20 shrink-0">
-                  <p
-                    className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                  >
-                    {month.name.slice(0, 3)}
-                  </p>
-                  <p className="text-xs text-slate-400">{month.days} days</p>
-                </div>
-
-                <div className="relative flex-1">
-                  <div className="absolute inset-0 z-10 grid grid-cols-[repeat(31,minmax(0,1fr))] gap-px">
-                    {segments.map((segment, index) => {
-                      const event = sampleEvents.find(
-                        (item) => item.id === segment.id,
-                      )
-                      return (
-                        <div
-                          key={`${segment.id}-${index}`}
-                          className={`col-span-1 row-span-1 flex cursor-pointer items-center rounded-full px-2 text-[11px] font-medium shadow-[0_10px_24px_-18px_rgba(15,23,42,0.8)] transition hover:translate-y-[-1px] ${toneStyles[segment.tone]}`}
-                          style={{
-                            gridColumn: `${segment.startDay} / span ${
-                              segment.endDay - segment.startDay + 1
-                            }`,
-                          }}
-                          onMouseEnter={(eventMeta) =>
-                            event &&
-                            handleVisionHover(
-                              event,
-                              month.index,
-                              eventMeta.currentTarget as HTMLDivElement,
-                            )
-                          }
-                          onMouseLeave={() => setVisionHover(null)}
+              <div
+                className="relative z-0 grid gap-1.5"
+                style={{
+                  gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                  gridTemplateRows: weekRowHeights.join(" "),
+                }}
+                role="grid"
+                aria-labelledby="year-flow-label"
+                aria-owns={yearDayIds.length > 0 ? yearDayIds.join(" ") : undefined}
+              >
+                {yearGrid.map((day, index) => {
+                  if (!day) {
+                    return (
+                      <div
+                        key={`year-pad-${index}`}
+                        className="h-full rounded-md bg-transparent"
+                      />
+                    )
+                  }
+                  const dayKey = formatDateKey(day.date)
+                  const isFlash = flashDateKey === dayKey
+                  const isRangeActive =
+                    addMode &&
+                    rangeStart &&
+                    rangeEnd &&
+                    isDateWithinRange(day.date, rangeStart, rangeEnd)
+                  return (
+                    <a
+                      id={`year-day-${dayKey}`}
+                      key={`${day.date.toISOString()}-mobile-year`}
+                      href={`/day?date=${dayKey}`}
+                      onMouseEnter={() => {
+                        handleHover(day.date)
+                        if (addMode && rangeStart) {
+                          setRangeEnd(day.date)
+                        }
+                      }}
+                      onFocus={() => handleHover(day.date)}
+                      onClick={(event) => {
+                        if (addMode) {
+                          event.preventDefault()
+                        }
+                        handleHover(day.date)
+                        handleRangeClick(day.date)
+                        handleDaySelect(day.date)
+                      }}
+                      aria-label={`${monthNames[day.monthIndex]} ${
+                        day.dayNumber
+                      }, ${activeYear}`}
+                      aria-current={isFlash ? "date" : undefined}
+                      className={[
+                        "group relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs transition",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70",
+                        "hover:bg-slate-100",
+                        addMode ? "cursor-crosshair" : "cursor-pointer",
+                        day.isWeekend
+                          ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
+                          : "",
+                        isRangeActive ? "border-slate-900 bg-slate-100" : "",
+                        isFlash ? "animate-year-flash ring-2 ring-amber-300" : "",
+                      ].join(" ")}
+                      style={{ paddingTop: yearEventOffset }}
+                    >
+                      {addMode && (
+                        <span
+                          className="pointer-events-none absolute right-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-[12px] font-semibold text-slate-500 opacity-0 transition group-hover:opacity-100"
+                          style={{ top: dayOverlayTop }}
                         >
-                          <span className="truncate">{segment.label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="relative z-0 grid grid-cols-[repeat(31,minmax(0,1fr))] gap-px">
-                    {Array.from({ length: 31 }, (_, dayIndex) => {
-                      const dayNumber = dayIndex + 1
-                      const isActive = dayNumber <= month.days
-                      const dayDate = new Date(
-                        year,
-                        month.index,
-                        dayNumber,
-                      )
-                      const dayOfWeek = dayDate.getDay()
-                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-                      return (
-                        <button
-                          key={`${month.name}-${dayNumber}`}
-                          type="button"
-                          disabled={!isActive}
-                          onMouseEnter={() => isActive && handleHover(dayDate)}
-                          onClick={() => isActive && handleHover(dayDate)}
-                          aria-label={`${month.name} ${dayNumber}, ${year}`}
-                          className={[
-                            "relative h-9 rounded-md border border-transparent px-1 text-left text-[10px] transition",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70",
-                            isActive
-                              ? "bg-white/90 text-slate-800 hover:bg-slate-900 hover:text-white"
-                              : "bg-slate-100/70 text-slate-300",
-                            isActive && isWeekend
-                              ? "bg-slate-50/90 text-slate-600"
-                              : "",
-                          ].join(" ")}
-                        >
-                          {isActive && (
-                            <>
-                              <span
-                                className="block text-[9px] text-slate-400"
-                                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                              >
-                                {weekdayShort[dayOfWeek]}
-                              </span>
-                              <span
-                                className="text-[11px] font-semibold"
-                                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                              >
-                                {dayNumber}
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div
-                    className={[
-                      "pointer-events-none absolute z-30 w-[200px] origin-bottom transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-                      isActiveTooltip
-                        ? "opacity-100 scale-100"
-                        : "opacity-0 scale-95",
-                    ].join(" ")}
-                    style={
-                      isActiveTooltip
-                        ? {
-                            left: visionHover?.left ?? "50%",
-                            top: visionHover?.top ?? 0,
-                            transform: "translate(-50%, -115%)",
-                          }
-                        : {
-                            left: "50%",
-                            top: 0,
-                            transform: "translate(-50%, -110%)",
-                          }
-                    }
-                  >
-                    {isActiveTooltip && visionHover && (
-                      <div className="relative">
-                        <div className="absolute -bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white/90 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.9)]" />
-                        <div className="rounded-2xl border border-white/70 bg-white/90 p-3 shadow-[0_30px_60px_-40px_rgba(15,23,42,0.9)]">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                            Vision board
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900">
-                            {visionHover.event.label}
-                          </p>
-                          <div className="relative mt-3 h-[150px]">
-                            {visionHover.event.images
-                              .slice(0, 3)
-                              .map((image, imageIndex) => (
-                                <div
-                                  key={image}
-                                  className="absolute left-1/2 top-0 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-                                  style={{
-                                    transform: `translate(${
-                                      imageIndex * 28 - 28
-                                    }px, ${imageIndex * 10}px) rotate(${
-                                      imageIndex % 2 === 0 ? -6 : 5
-                                    }deg)`,
-                                    zIndex: 3 - imageIndex,
-                                    transitionDelay: `${imageIndex * 40}ms`,
-                                  }}
-                                >
-                                  <div className="w-[120px] rounded-lg border border-slate-200 bg-white p-2 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.8)]">
-                                    <div className="aspect-[3/4] overflow-hidden rounded-md bg-slate-100">
-                                      <img
-                                        src={image}
-                                        alt={`${visionHover.event.label} vision`}
-                                        className="h-full w-full object-cover"
-                                      />
-                                    </div>
-                                    <div className="mt-2 h-3 w-2/3 rounded-full bg-slate-200/80" />
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                          +
+                        </span>
+                      )}
+                      {day.isMonthStart && (
+                        <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
+                          {monthNames[day.monthIndex].slice(0, 3)}
+                        </span>
+                      )}
+                      <span
+                        className="mt-4 block text-[12px] font-semibold text-slate-900"
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        {day.dayNumber}
+                      </span>
+                    </a>
+                  )
+                })}
               </div>
             </div>
-          )
-        })}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+            {spannedEvents.map((event) => (
+              <div
+                key={`${event.id}-mobile-pill`}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
+              >
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
+                />
+                <span className="font-semibold text-slate-800">
+                  {event.label}
+                </span>
+                <span className="text-slate-500">
+                  {formatEventRange(event)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-slate-400">
+            Layout note: ultra-wide refinements are queued post-launch.
+          </p>
+        </div>
       </div>
 
       <div className="relative z-10 mt-8 flex flex-wrap gap-3 text-xs text-slate-500">
-        {sampleEvents.map((event) => (
+        {spannedEvents.map((event) => (
           <span
             key={event.id}
             className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-3 py-1"
