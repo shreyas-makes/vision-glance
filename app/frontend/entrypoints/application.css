@@ -144,3 +144,18 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+@keyframes year-flash {
+  0% {
+    background-color: rgba(251, 191, 36, 0.35);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@layer utilities {
+  .animate-year-flash {
+    animation: year-flash 1.6s ease-out;
+  }
+}
