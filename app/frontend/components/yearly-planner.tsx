@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 type PlannerEvent = {
-  id: string
+  id: string | number
   label: string
   start: string
   end: string
@@ -14,13 +21,15 @@ type VisionEvent = PlannerEvent & {
   images: string[]
 }
 
+type EventPayload = Omit<VisionEvent, "id" | "createdAt">
+
 type PlannerEventWithDates = VisionEvent & {
   startDate: Date
   endDate: Date
 }
 
 type EventSegment = {
-  id: string
+  id: PlannerEvent["id"]
   label: string
   tone: PlannerEvent["tone"]
   startDay: number
@@ -31,11 +40,6 @@ type EventSegment = {
   colEnd: number
   createdAt: number
 }
-
-type HoverInfo = {
-  date: Date
-  events: PlannerEventWithDates[]
-} | null
 
 const monthNames = [
   "January",
@@ -138,35 +142,6 @@ const sampleEvents: VisionEvent[] = [
 function toDate(value: string) {
   const [year, month, day] = value.split("-").map(Number)
   return new Date(year, month - 1, day)
-}
-
-function isDateInRange(date: Date, start: Date, end: Date) {
-  const dateValue = date.setHours(0, 0, 0, 0)
-  const startValue = start.setHours(0, 0, 0, 0)
-  const endValue = end.setHours(0, 0, 0, 0)
-  return dateValue >= startValue && dateValue <= endValue
-}
-
-function isDateWithinRange(date: Date, start: Date, end: Date) {
-  const dateValue = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime()
-  const startValue = new Date(
-    start.getFullYear(),
-    start.getMonth(),
-    start.getDate(),
-  ).getTime()
-  const endValue = new Date(
-    end.getFullYear(),
-    end.getMonth(),
-    end.getDate(),
-  ).getTime()
-  return (
-    dateValue >= Math.min(startValue, endValue) &&
-    dateValue <= Math.max(startValue, endValue)
-  )
 }
 
 function isLeapYear(year: number) {
@@ -286,18 +261,29 @@ function formatDateKey(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
+type YearlyPlannerProps = {
+  year?: number
+  events?: VisionEvent[]
+  onCreateEvent?: (event: EventPayload) => void
+}
+
+export default function YearlyPlanner({
+  year = 2026,
+  events: eventsProp,
+  onCreateEvent,
+}: YearlyPlannerProps) {
   const [activeYear, setActiveYear] = useState(year)
-  const [, setHoverInfo] = useState<HoverInfo>(null)
-  const [, setJumpDate] = useState("")
-  const [flashDateKey, setFlashDateKey] = useState<string | null>(null)
   const [gridColumns, setGridColumns] = useState(7)
   const [gridCellSize, setGridCellSize] = useState(56)
-  const [addMode, setAddMode] = useState(false)
-  const [rangeStart, setRangeStart] = useState<Date | null>(null)
-  const [rangeEnd, setRangeEnd] = useState<Date | null>(null)
-  const [events, setEvents] = useState<VisionEvent[]>(sampleEvents)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [eventTitle, setEventTitle] = useState("")
+  const [eventEmoji, setEventEmoji] = useState("")
+  const [eventStart, setEventStart] = useState("")
+  const [eventEnd, setEventEnd] = useState("")
+  const [eventImages, setEventImages] = useState<string[]>([])
+  const [events, setEvents] = useState<VisionEvent[]>(eventsProp ?? sampleEvents)
   const yearGridRef = useRef<HTMLDivElement | null>(null)
+  const isSubmitDisabled = !eventTitle.trim() || !eventStart || !eventEnd
 
   const eventDates = useMemo(() => {
     return events.map((event) => ({
@@ -312,12 +298,8 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
   }, [year])
 
   useEffect(() => {
-    if (!flashDateKey) return
-    const timeout = window.setTimeout(() => {
-      setFlashDateKey(null)
-    }, 1600)
-    return () => window.clearTimeout(timeout)
-  }, [flashDateKey])
+    setEvents(eventsProp ?? sampleEvents)
+  }, [eventsProp])
 
   useEffect(() => {
     const container = yearGridRef.current
@@ -501,62 +483,69 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
         (maxEventStack - 1) * yearEventRowGap +
         6
       : 0
-  const dayOverlayTop = yearEventOffset + 6
 
   const weekRowHeights = useMemo(() => {
     const rowHeight = gridCellSize + yearEventOffset
     return Array.from({ length: weekRows }, () => `${rowHeight}px`)
   }, [gridCellSize, weekRows, yearEventOffset])
 
-  const handleHover = (date: Date) => {
-    const matching = spannedEvents.filter((event) =>
-      isDateInRange(date, event.startDate, event.endDate),
-    )
-    setHoverInfo({ date, events: matching })
-  }
-
-  const handleAddToggle = () => {
-    setAddMode((prev) => {
-      if (prev) {
-        setRangeStart(null)
-        setRangeEnd(null)
-      }
-      return !prev
-    })
-  }
-
-  const handleRangeClick = (date: Date) => {
-    if (!addMode) return
-    if (!rangeStart) {
-      setRangeStart(date)
-      setRangeEnd(date)
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (!files.length) {
+      setEventImages([])
       return
     }
-    const start =
-      date.getTime() < rangeStart.getTime() ? date : rangeStart
-    const end = date.getTime() < rangeStart.getTime() ? rangeStart : date
-    const createdAt = Date.now()
-    const tone = toneOrder[events.length % toneOrder.length]
-    setEvents((prev) => [
-      ...prev,
-      {
-        id: `event-${createdAt}`,
-        label: "New event",
-        start: formatDateKey(start),
-        end: formatDateKey(end),
-        tone,
-        images: [],
-        createdAt,
-      },
-    ])
-    setRangeStart(null)
-    setRangeEnd(null)
+    const previews = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result))
+            reader.onerror = () => reject(reader.error)
+            reader.readAsDataURL(file)
+          }),
+      ),
+    )
+    setEventImages(previews)
   }
 
-  const handleDaySelect = (date: Date) => {
-    const key = formatDateKey(date)
-    setJumpDate(key)
-    setFlashDateKey(key)
+  const handleEventSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!eventTitle.trim() || !eventStart || !eventEnd) return
+    const startDate = toDate(eventStart)
+    const endDate = toDate(eventEnd)
+    const start =
+      startDate.getTime() <= endDate.getTime() ? startDate : endDate
+    const end =
+      startDate.getTime() <= endDate.getTime() ? endDate : startDate
+    const tone = toneOrder[events.length % toneOrder.length]
+    const label = `${eventEmoji.trim()} ${eventTitle.trim()}`.trim()
+    const payload: EventPayload = {
+      label,
+      start: formatDateKey(start),
+      end: formatDateKey(end),
+      tone,
+      images: eventImages,
+    }
+    if (onCreateEvent) {
+      onCreateEvent(payload)
+    } else {
+      const createdAt = Date.now()
+      setEvents((prev) => [
+        ...prev,
+        {
+          id: `event-${createdAt}`,
+          createdAt,
+          ...payload,
+        },
+      ])
+    }
+    setEventTitle("")
+    setEventEmoji("")
+    setEventStart("")
+    setEventEnd("")
+    setEventImages([])
+    setIsSheetOpen(false)
   }
 
   const weekdayLabels = useMemo(
@@ -569,7 +558,8 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
     [spannedEvents],
   )
   return (
-    <section className="relative w-full overflow-visible rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
+    <>
+      <section className="relative w-full overflow-visible rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
         <div className="absolute -right-20 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(107,181,197,0.45),rgba(255,255,255,0))]" />
         <div className="absolute -left-24 -bottom-32 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(242,183,141,0.45),rgba(255,255,255,0))]" />
@@ -607,21 +597,6 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col items-center">
-          <button
-            type="button"
-            onClick={handleAddToggle}
-            aria-pressed={addMode}
-            className={[
-              "inline-flex items-center gap-2 rounded-full border px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition",
-              addMode
-                ? "border-slate-900 bg-slate-900 text-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.8)]"
-                : "border-slate-900 bg-slate-900 text-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.6)] hover:bg-slate-800",
-            ].join(" ")}
-          >
-            Add event
-          </button>
-        </div>
       </div>
 
       <div className="relative z-10 mt-8 space-y-4">
@@ -733,57 +708,22 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                     )
                   }
                   const dayKey = formatDateKey(day.date)
-                  const isFlash = flashDateKey === dayKey
-                  const isRangeActive =
-                    addMode &&
-                    rangeStart &&
-                    rangeEnd &&
-                    isDateWithinRange(day.date, rangeStart, rangeEnd)
                   return (
-                    <a
+                    <div
                       id={`year-day-${dayKey}`}
                       key={`${day.date.toISOString()}-mobile-year`}
-                      href={`/day?date=${dayKey}`}
-                      onMouseEnter={() => {
-                        handleHover(day.date)
-                        if (addMode && rangeStart) {
-                          setRangeEnd(day.date)
-                        }
-                      }}
-                      onFocus={() => handleHover(day.date)}
-                      onClick={(event) => {
-                        if (addMode) {
-                          event.preventDefault()
-                        }
-                        handleHover(day.date)
-                        handleRangeClick(day.date)
-                        handleDaySelect(day.date)
-                      }}
+                      role="gridcell"
                       aria-label={`${monthNames[day.monthIndex]} ${
                         day.dayNumber
                       }, ${activeYear}`}
-                      aria-current={isFlash ? "date" : undefined}
                       className={[
-                        "group relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs transition",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70",
-                        "hover:bg-slate-100",
-                        addMode ? "cursor-crosshair" : "cursor-pointer",
+                        "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
                         day.isWeekend
                           ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
                           : "",
-                        isRangeActive ? "border-slate-900 bg-slate-100" : "",
-                        isFlash ? "animate-year-flash ring-2 ring-amber-300" : "",
                       ].join(" ")}
                       style={{ paddingTop: yearEventOffset }}
                     >
-                      {addMode && (
-                        <span
-                          className="pointer-events-none absolute right-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-[12px] font-semibold text-slate-500 opacity-0 transition group-hover:opacity-100"
-                          style={{ top: dayOverlayTop }}
-                        >
-                          +
-                        </span>
-                      )}
                       {day.isMonthStart && (
                         <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
                           {monthNames[day.monthIndex].slice(0, 3)}
@@ -795,7 +735,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                       >
                         {day.dayNumber}
                       </span>
-                    </a>
+                    </div>
                   )
                 })}
               </div>
@@ -815,6 +755,111 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
           </div>
         </div>
       </div>
-    </section>
+      </section>
+      <button
+        type="button"
+        onClick={() => setIsSheetOpen(true)}
+        className="group fixed bottom-6 right-6 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_22px_48px_-24px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60"
+        aria-label="Add new vision"
+      >
+        <span className="text-2xl leading-none">+</span>
+      </button>
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="right" className="w-full max-w-md">
+          <SheetHeader>
+            <SheetTitle className="text-lg font-semibold text-slate-900">
+              Add vision
+            </SheetTitle>
+            <SheetDescription className="text-sm text-slate-500">
+              Capture the moment and attach imagery for quick hover previews.
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleEventSubmit} className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Title
+              </label>
+              <input
+                value={eventTitle}
+                onChange={(event) => setEventTitle(event.target.value)}
+                placeholder="Vision title"
+                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Emoji
+              </label>
+              <input
+                value={eventEmoji}
+                onChange={(event) => setEventEmoji(event.target.value)}
+                placeholder="✨"
+                maxLength={4}
+                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Start date
+                </label>
+                <input
+                  type="date"
+                  value={eventStart}
+                  onChange={(event) => setEventStart(event.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  End date
+                </label>
+                <input
+                  type="date"
+                  value={eventEnd}
+                  onChange={(event) => setEventEnd(event.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Images
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageChange}
+                className="w-full text-sm text-slate-600 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-white"
+              />
+              {eventImages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {eventImages.map((image) => (
+                    <div
+                      key={image}
+                      className="h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                    >
+                      <img
+                        src={image}
+                        alt="Vision upload preview"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitDisabled}
+              className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              Save vision
+            </button>
+          </form>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }
