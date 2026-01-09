@@ -1,38 +1,36 @@
-import { Head } from "@inertiajs/react"
+import { Head, router } from "@inertiajs/react"
 
-import { PlaceholderPattern } from "@/components/placeholder-pattern"
-import AppLayout from "@/layouts/app-layout"
-import { dashboardPath } from "@/routes"
-import type { BreadcrumbItem } from "@/types"
+import YearlyPlanner from "@/components/yearly-planner"
+import { eventsPath } from "@/routes"
+import type { CalendarEvent } from "@/types"
 
-const breadcrumbs: BreadcrumbItem[] = [
-  {
-    title: "Dashboard",
-    href: dashboardPath(),
-  },
-]
+type EventPayload = Pick<
+  CalendarEvent,
+  "label" | "start" | "end" | "tone" | "images"
+>
 
-export default function Dashboard() {
+type DashboardProps = {
+  events: CalendarEvent[]
+}
+
+export default function Dashboard({ events }: DashboardProps) {
+  const handleCreateEvent = (payload: EventPayload) => {
+    router.post(eventsPath(), payload, { preserveScroll: true })
+  }
+
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
-      <Head title={breadcrumbs[breadcrumbs.length - 1].title} />
+    <div className="min-h-screen bg-slate-50/40 px-4 py-6 sm:px-6 sm:py-8">
+      <Head title="Dashboard">
+        <link rel="preconnect" href="https://fonts.bunny.net" />
+        <link
+          href="https://fonts.bunny.net/css?family=fraunces:400,600|jetbrains-mono:400,600|space-grotesk:400,600"
+          rel="stylesheet"
+        />
+      </Head>
 
-      <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-            <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-          </div>
-          <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-            <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-          </div>
-          <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-            <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-          </div>
-        </div>
-        <div className="border-sidebar-border/70 dark:border-sidebar-border relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border md:min-h-min">
-          <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-        </div>
+      <div className="mx-auto flex w-full max-w-7xl flex-col">
+        <YearlyPlanner events={events} onCreateEvent={handleCreateEvent} />
       </div>
-    </AppLayout>
+    </div>
   )
 }

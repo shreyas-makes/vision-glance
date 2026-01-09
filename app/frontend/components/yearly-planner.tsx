@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 
 import {
   Sheet,
@@ -83,7 +91,14 @@ const createPolaroidImage = (label: string, hue: number) => {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-const sampleEvents: VisionEvent[] = [
+function formatDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, "0")
+  const day = `${date.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const sampleEventTemplates: VisionEvent[] = [
   {
     id: "copenhagen",
     label: "Copenhagen sprint",
@@ -138,6 +153,20 @@ const sampleEvents: VisionEvent[] = [
     images: [createPolaroidImage("Oasis", 240)],
   },
 ]
+
+const createSampleEventsForYear = (year: number) =>
+  sampleEventTemplates.map((event) => {
+    const startDate = toDate(event.start)
+    const endDate = toDate(event.end)
+    const start = new Date(year, startDate.getMonth(), startDate.getDate())
+    const end = new Date(year, endDate.getMonth(), endDate.getDate())
+    return {
+      ...event,
+      id: `${event.id}-${year}`,
+      start: formatDateKey(start),
+      end: formatDateKey(end),
+    }
+  })
 
 function toDate(value: string) {
   const [year, month, day] = value.split("-").map(Number)
@@ -254,23 +283,18 @@ function getDayOfYear(date: Date) {
   return Math.floor(diff / 86400000) + 1
 }
 
-function formatDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
 type YearlyPlannerProps = {
   year?: number
   events?: VisionEvent[]
   onCreateEvent?: (event: EventPayload) => void
+  heroCTA?: ReactNode
 }
 
 export default function YearlyPlanner({
   year = 2026,
   events: eventsProp,
   onCreateEvent,
+  heroCTA,
 }: YearlyPlannerProps) {
   const [activeYear, setActiveYear] = useState(year)
   const [gridColumns, setGridColumns] = useState(7)
@@ -281,7 +305,10 @@ export default function YearlyPlanner({
   const [eventStart, setEventStart] = useState("")
   const [eventEnd, setEventEnd] = useState("")
   const [eventImages, setEventImages] = useState<string[]>([])
-  const [events, setEvents] = useState<VisionEvent[]>(eventsProp ?? sampleEvents)
+  const [useSampleEvents, setUseSampleEvents] = useState(!eventsProp)
+  const [events, setEvents] = useState<VisionEvent[]>(
+    eventsProp ?? createSampleEventsForYear(year),
+  )
   const yearGridRef = useRef<HTMLDivElement | null>(null)
   const isSubmitDisabled = !eventTitle.trim() || !eventStart || !eventEnd
 
@@ -298,8 +325,15 @@ export default function YearlyPlanner({
   }, [year])
 
   useEffect(() => {
-    setEvents(eventsProp ?? sampleEvents)
-  }, [eventsProp])
+    if (eventsProp) {
+      setEvents(eventsProp)
+      setUseSampleEvents(false)
+      return
+    }
+    if (useSampleEvents) {
+      setEvents(createSampleEventsForYear(activeYear))
+    }
+  }, [eventsProp, activeYear, useSampleEvents])
 
   useEffect(() => {
     const container = yearGridRef.current
@@ -485,7 +519,8 @@ export default function YearlyPlanner({
       : 0
 
   const weekRowHeights = useMemo(() => {
-    const rowHeight = gridCellSize + yearEventOffset
+    const dayCellHeight = Math.max(70, Math.round(gridCellSize * 2.5))
+    const rowHeight = dayCellHeight + yearEventOffset
     return Array.from({ length: weekRows }, () => `${rowHeight}px`)
   }, [gridCellSize, weekRows, yearEventOffset])
 
@@ -530,6 +565,7 @@ export default function YearlyPlanner({
     if (onCreateEvent) {
       onCreateEvent(payload)
     } else {
+      setUseSampleEvents(false)
       const createdAt = Date.now()
       setEvents((prev) => [
         ...prev,
@@ -579,6 +615,9 @@ export default function YearlyPlanner({
           <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
             Your year ahead at a glance. Map out your vision board, directly on the calendar.
           </p>
+          {heroCTA ? (
+            <div className="mt-6 w-full max-w-xl">{heroCTA}</div>
+          ) : null}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
             <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
               Shortcuts

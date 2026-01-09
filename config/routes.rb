@@ -5,9 +5,11 @@ Rails.application.routes.draw do
   post "sign_in", to: "sessions#create"
   get  "sign_up", to: "users#new", as: :sign_up
   post "sign_up", to: "users#create"
+  post "google_sign_in", to: "identity/google_sessions#create"
 
   resources :sessions, only: [:destroy]
   resource :users, only: [:destroy]
+  resources :events, only: [:create]
 
   namespace :identity do
     resource :email_verification, only: [:show, :create]

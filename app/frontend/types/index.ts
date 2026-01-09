@@ -43,3 +43,13 @@ export interface Session {
   ip_address: string
   created_at: string
 }
+
+export interface CalendarEvent {
+  id: number | string
+  label: string
+  start: string
+  end: string
+  tone: "sea" | "sunset" | "orchid" | "ink"
+  images: string[]
+  createdAt?: number
+}

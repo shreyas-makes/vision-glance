@@ -1,5 +1,6 @@
 import { Form, Head } from "@inertiajs/react"
 
+import GoogleSignInButton from "@/components/google-signin-button"
 import InputError from "@/components/input-error"
 import TextLink from "@/components/text-link"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,24 @@ export default function Register() {
       >
         {({ processing, errors }) => (
           <>
+            <div className="grid gap-3 text-center">
+              <p className="text-muted-foreground text-sm">
+                Recommended: continue with Google for faster setup.
+              </p>
+              <GoogleSignInButton />
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or sign up with email
+                </span>
+              </div>
+            </div>
+
             <div className="grid gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>

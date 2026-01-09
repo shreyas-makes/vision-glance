@@ -41,6 +41,7 @@ gem "vite_rails", "~> 3.0"
 
 # The Rails adapter for Inertia.js [https://inertia-rails.dev]
 gem "inertia_rails", "~> 3.6"
+gem "google-id-token"
 
 # An authentication system generator for Rails applications
 # we leave gem here to watch for security updates

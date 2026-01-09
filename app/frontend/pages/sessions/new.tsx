@@ -1,5 +1,6 @@
 import { Form, Head } from "@inertiajs/react"
 
+import GoogleSignInButton from "@/components/google-signin-button"
 import InputError from "@/components/input-error"
 import TextLink from "@/components/text-link"
 import { Button } from "@/components/ui/button"
@@ -7,7 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
 import AuthLayout from "@/layouts/auth-layout"
-import { newIdentityPasswordResetPath, signInPath, signUpPath } from "@/routes"
+import {
+  newIdentityPasswordResetPath,
+  rootPath,
+  signInPath,
+  signUpPath,
+} from "@/routes"
 
 export default function Login() {
   return (
@@ -74,11 +80,30 @@ export default function Login() {
               </Button>
             </div>
 
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <GoogleSignInButton />
+            </div>
+
             <div className="text-muted-foreground text-center text-sm">
               Don&apos;t have an account?{" "}
               <TextLink href={signUpPath()} tabIndex={5}>
                 Sign up
               </TextLink>
+            </div>
+
+            <div className="text-muted-foreground text-center text-sm">
+              <TextLink href={rootPath()}>Back to home</TextLink>
             </div>
           </>
         )}
