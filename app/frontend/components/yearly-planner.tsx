@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 type PlannerEvent = {
   id: string
   label: string
@@ -13,6 +14,11 @@ type VisionEvent = PlannerEvent & {
   images: string[]
 }
 
+type PlannerEventWithDates = VisionEvent & {
+  startDate: Date
+  endDate: Date
+}
+
 type EventSegment = {
   id: string
   label: string
@@ -23,7 +29,7 @@ type EventSegment = {
 
 type HoverInfo = {
   date: Date
-  events: PlannerEvent[]
+  events: PlannerEventWithDates[]
 } | null
 
 const monthNames = [
@@ -177,6 +183,95 @@ function formatEventRange(event: PlannerEvent) {
   return `${startMonth} ${start.getDate()}–${endMonth} ${end.getDate()}`
 }
 
+function VisionTooltipContent({ event }: { event: VisionEvent }) {
+  return (
+    <div className="relative">
+      <div className="absolute -bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white/95 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.9)]" />
+      <div className="rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_30px_60px_-40px_rgba(15,23,42,0.9)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Vision board
+        </p>
+        <p className="mt-1 text-sm font-semibold text-slate-900">
+          {event.label}
+        </p>
+        <div className="relative mt-3 h-[150px]">
+          {event.images.slice(0, 3).map((image, imageIndex) => (
+            <div
+              key={image}
+              className="absolute left-1/2 top-0 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              style={{
+                transform: `translate(${imageIndex * 28 - 28}px, ${
+                  imageIndex * 10
+                }px) rotate(${imageIndex % 2 === 0 ? -6 : 5}deg)`,
+                zIndex: 3 - imageIndex,
+                transitionDelay: `${imageIndex * 40}ms`,
+              }}
+            >
+              <div className="w-[120px] rounded-lg border border-slate-200 bg-white p-2 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.8)]">
+                <div className="aspect-[3/4] overflow-hidden rounded-md bg-slate-100">
+                  <img
+                    src={image}
+                    alt={`${event.label} vision`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="mt-2 h-3 w-2/3 rounded-full bg-slate-200/80" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EventPill({
+  event,
+  pillClassName,
+  labelClassName,
+  rangeClassName,
+  showRange = true,
+}: {
+  event: VisionEvent
+  pillClassName: string
+  labelClassName?: string
+  rangeClassName?: string
+  showRange?: boolean
+}) {
+  const hasImages = event.images.length > 0
+  const pill = (
+    <div
+      className={`${pillClassName}${hasImages ? " cursor-pointer" : ""}`}
+      tabIndex={hasImages ? 0 : undefined}
+      role={hasImages ? "button" : undefined}
+    >
+      <span className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`} />
+      <span className={labelClassName}>{event.label}</span>
+      {showRange && (
+        <span className={rangeClassName}>{formatEventRange(event)}</span>
+      )}
+    </div>
+  )
+
+  if (!hasImages) {
+    return <div className="inline-flex">{pill}</div>
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{pill}</TooltipTrigger>
+      <TooltipContent
+        side="top"
+        sideOffset={12}
+        className="border-0 bg-transparent p-0 shadow-none"
+        hideArrow
+      >
+        <VisionTooltipContent event={event} />
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function getDayOfYear(date: Date) {
   const startOfYear = new Date(date.getFullYear(), 0, 1)
   const diff = date.getTime() - startOfYear.getTime()
@@ -200,7 +295,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
   const [addMode, setAddMode] = useState(false)
   const [rangeStart, setRangeStart] = useState<Date | null>(null)
   const [rangeEnd, setRangeEnd] = useState<Date | null>(null)
-  const [events, setEvents] = useState<PlannerEvent[]>(sampleEvents)
+  const [events, setEvents] = useState<VisionEvent[]>(sampleEvents)
   const yearGridRef = useRef<HTMLDivElement | null>(null)
 
   const eventDates = useMemo(() => {
@@ -467,6 +562,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
         start: formatDateKey(start),
         end: formatDateKey(end),
         tone,
+        images: [],
         createdAt,
       },
     ])
@@ -500,120 +596,65 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
       Array.from({ length: gridColumns }, (_, index) => weekdayShort[index % 7]),
     [gridColumns],
   )
+  const eventById = useMemo(
+    () => new Map(spannedEvents.map((event) => [event.id, event])),
+    [spannedEvents],
+  )
 
   return (
-    <section className="relative w-full overflow-hidden rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
-      <div className="pointer-events-none absolute -right-20 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(107,181,197,0.45),rgba(255,255,255,0))]" />
-      <div className="pointer-events-none absolute -left-24 -bottom-32 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(242,183,141,0.45),rgba(255,255,255,0))]" />
+    <section className="relative w-full overflow-visible rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
+        <div className="absolute -right-20 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(107,181,197,0.45),rgba(255,255,255,0))]" />
+        <div className="absolute -left-24 -bottom-32 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(242,183,141,0.45),rgba(255,255,255,0))]" />
+      </div>
 
-      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <div className="relative z-10">
+        <div className="flex flex-col items-center text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
             Life Planner
           </p>
           <h1
-            className="mt-2 text-4xl font-semibold text-slate-950 sm:text-5xl"
+            className="mt-3 text-5xl font-semibold text-slate-950 sm:text-7xl lg:text-8xl"
             style={{ fontFamily: "'Fraunces', serif" }}
           >
             {activeYear}
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
+          <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
             A single-scan calendar for the year ahead. Hover across stretches to
             preview trips, milestones, and focus windows.
           </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
+              Shortcuts
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                  ←
+                </kbd>
+                <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                  →
+                </kbd>
+              </div>
+              <span className="text-[11px] text-slate-500">Switch years</span>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:items-end">
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-xs text-slate-600 shadow-[0_16px_40px_-32px_rgba(15,23,42,0.6)]">
-            <button
-              type="button"
-              onClick={() => setActiveYear((prev) => prev - 1)}
-              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-              aria-label="Previous year"
-            >
-              Prev
-            </button>
-            <div className="rounded-full border border-slate-200/80 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-500">
-              {activeYear}
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveYear((prev) => prev + 1)}
-              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-              aria-label="Next year"
-            >
-              Next
-            </button>
-            <label className="sr-only" htmlFor="year-jump">
-              Jump to date
-            </label>
-            <input
-              id="year-jump"
-              type="date"
-              value={jumpDate}
-              onChange={(event) => {
-                const value = event.target.value
-                setJumpDate(value)
-                handleJump(value)
-              }}
-              className="h-8 rounded-full border border-slate-200 bg-white px-3 text-[11px] text-slate-600"
-            />
-            <span className="text-[11px] text-slate-400">
-              Use Left/Right for years
-            </span>
-          </div>
-
+        <div className="mt-6 flex flex-col items-center">
           <button
             type="button"
             onClick={handleAddToggle}
             aria-pressed={addMode}
             className={[
-              "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+              "inline-flex items-center gap-2 rounded-full border px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition",
               addMode
-                ? "border-slate-900 bg-slate-900 text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.8)]"
-                : "border-slate-200/80 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+                ? "border-slate-900 bg-slate-900 text-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.8)]"
+                : "border-slate-900 bg-slate-900 text-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.6)] hover:bg-slate-800",
             ].join(" ")}
           >
-            {addMode ? "Add mode on" : "Add"}
+            Add event
           </button>
-
-          <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-sm shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)]">
-            <p className="text-xs font-medium uppercase tracking-[0.25em] text-slate-400">
-              {addMode ? "Add event" : "Hover preview"}
-            </p>
-            {addMode ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Click a start date, then an end date to block the range.
-              </p>
-            ) : hoverInfo ? (
-              <div className="mt-2 space-y-2">
-                <p className="text-sm font-semibold text-slate-900">
-                  {formatHoverDate(hoverInfo.date)}
-                </p>
-                {hoverInfo.events.length > 0 ? (
-                  <ul className="space-y-1 text-xs text-slate-600">
-                    {hoverInfo.events.map((event) => (
-                      <li key={event.id} className="flex items-center gap-2">
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
-                        />
-                        <span>{event.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-slate-500">No events in range.</p>
-                )}
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-slate-500">
-                <span className="sm:hidden">Tap any date to surface its events.</span>
-                <span className="hidden sm:inline">
-                  Hover any date to surface its events.
-                </span>
-              </p>
-            )}
-          </div>
         </div>
       </div>
 
@@ -631,9 +672,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                 {daysInYear} days · {spannedEvents.length} events
               </p>
             </div>
-            <div className="rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] text-slate-500">
-              Month markers at day 1
-            </div>
+            <div />
           </div>
 
           <div className="mt-3" ref={yearGridRef}>
@@ -661,21 +700,51 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
                   gridTemplateRows: weekRowHeights.join(" "),
                 }}
               >
-                {yearWeekSegments.segments.map((segment, index) => (
-                  <div
-                    key={`${segment.id}-year-${index}`}
-                    className={`flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]}`}
-                    style={{
-                      gridRow: segment.row,
-                      gridColumn: `${segment.colStart} / span ${segment.span}`,
-                      marginTop:
-                        segment.stackIndex *
-                        (yearEventRowHeight + yearEventRowGap),
-                    }}
-                  >
-                    <span className="truncate">{segment.label}</span>
-                  </div>
-                ))}
+                {yearWeekSegments.segments.map((segment, index) => {
+                  const segmentEvent = eventById.get(segment.id)
+                  const hasImages =
+                    segmentEvent && segmentEvent.images.length > 0
+                  const segmentPill = (
+                    <div
+                      className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
+                        hasImages ? "cursor-pointer" : ""
+                      }`}
+                      style={{
+                        gridRow: segment.row,
+                        gridColumn: `${segment.colStart} / span ${segment.span}`,
+                        marginTop:
+                          segment.stackIndex *
+                          (yearEventRowHeight + yearEventRowGap),
+                      }}
+                      tabIndex={hasImages ? 0 : undefined}
+                      role={hasImages ? "button" : undefined}
+                    >
+                      <span className="truncate">{segment.label}</span>
+                    </div>
+                  )
+
+                  if (!segmentEvent || !hasImages) {
+                    return (
+                      <div key={`${segment.id}-year-${index}`}>
+                        {segmentPill}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Tooltip key={`${segment.id}-year-${index}`}>
+                      <TooltipTrigger asChild>{segmentPill}</TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        sideOffset={12}
+                        className="border-0 bg-transparent p-0 shadow-none"
+                        hideArrow
+                      >
+                        <VisionTooltipContent event={segmentEvent} />
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                })}
               </div>
 
               <div
@@ -769,38 +838,16 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
 
           <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
             {spannedEvents.map((event) => (
-              <div
+              <EventPill
                 key={`${event.id}-mobile-pill`}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
-              >
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
-                />
-                <span className="font-semibold text-slate-800">
-                  {event.label}
-                </span>
-                <span className="text-slate-500">
-                  {formatEventRange(event)}
-                </span>
-              </div>
+                event={event}
+                pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
+                labelClassName="font-semibold text-slate-800"
+                rangeClassName="text-slate-500"
+              />
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-slate-400">
-            Layout note: ultra-wide refinements are queued post-launch.
-          </p>
         </div>
-      </div>
-
-      <div className="relative z-10 mt-8 flex flex-wrap gap-3 text-xs text-slate-500">
-        {spannedEvents.map((event) => (
-          <span
-            key={event.id}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white px-3 py-1"
-          >
-            <span className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`} />
-            {event.label}
-          </span>
-        ))}
       </div>
     </section>
   )
