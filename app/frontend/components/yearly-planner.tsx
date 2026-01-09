@@ -171,6 +171,7 @@ function isDateWithinRange(date: Date, start: Date, end: Date) {
 
 function isLeapYear(year: number) {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+}
 
 function formatEventRange(event: PlannerEvent) {
   const start = toDate(event.start)
@@ -586,8 +587,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
             {activeYear}
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-            A single-scan calendar for the year ahead. Hover across stretches to
-            preview trips, milestones, and focus windows.
+            Your year ahead at a glance. Map out your vision board, directly on the calendar.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
             <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
