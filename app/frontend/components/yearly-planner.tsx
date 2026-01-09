@@ -22,9 +22,14 @@ type PlannerEventWithDates = VisionEvent & {
 type EventSegment = {
   id: string
   label: string
+  tone: PlannerEvent["tone"]
   startDay: number
   endDay: number
-  tone: PlannerEvent["tone"]
+  row: number
+  colStart: number
+  span: number
+  colEnd: number
+  createdAt: number
 }
 
 type HoverInfo = {
@@ -166,11 +171,6 @@ function isDateWithinRange(date: Date, start: Date, end: Date) {
 
 function isLeapYear(year: number) {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-}
-
-function formatHoverDate(date: Date) {
-  return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-}
 
 function formatEventRange(event: PlannerEvent) {
   const start = toDate(event.start)
@@ -287,8 +287,8 @@ function formatDateKey(date: Date) {
 
 export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
   const [activeYear, setActiveYear] = useState(year)
-  const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null)
-  const [jumpDate, setJumpDate] = useState("")
+  const [, setHoverInfo] = useState<HoverInfo>(null)
+  const [, setJumpDate] = useState("")
   const [flashDateKey, setFlashDateKey] = useState<string | null>(null)
   const [gridColumns, setGridColumns] = useState(7)
   const [gridCellSize, setGridCellSize] = useState(56)
@@ -414,15 +414,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
         const endDay = getDayOfYear(endDate)
         const startIndex = yearStartOffset + startDay - 1
         const endIndex = yearStartOffset + endDay - 1
-        const segments: Array<
-          EventSegment & {
-            row: number
-            colStart: number
-            span: number
-            colEnd: number
-            createdAt: number
-          }
-        > = []
+        const segments: EventSegment[] = []
         let currentIndex = startIndex
         while (currentIndex <= endIndex) {
           const row = Math.floor(currentIndex / gridColumns)
@@ -448,17 +440,7 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
         return segments
       })
       .flat()
-      .filter(
-        (
-          segment,
-        ): segment is EventSegment & {
-          row: number
-          colStart: number
-          span: number
-          colEnd: number
-          createdAt: number
-        } => Boolean(segment),
-      )
+      .filter((segment): segment is EventSegment => Boolean(segment))
 
     const segmentsByRow = new Map<number, number[]>()
     const stackedSegments = rawSegments
@@ -576,21 +558,6 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
     setFlashDateKey(key)
   }
 
-  const handleJump = (value: string) => {
-    if (!value) return
-    const [yearValue, monthValue, dayValue] = value.split("-").map(Number)
-    if (!yearValue || !monthValue || !dayValue) return
-    const nextDate = new Date(yearValue, monthValue - 1, dayValue)
-    setActiveYear(nextDate.getFullYear())
-    setFlashDateKey(formatDateKey(nextDate))
-    window.requestAnimationFrame(() => {
-      const target =
-        document.getElementById(`year-day-${formatDateKey(nextDate)}`) ||
-        document.getElementById(`day-${formatDateKey(nextDate)}`)
-      target?.scrollIntoView({ block: "center", behavior: "smooth" })
-    })
-  }
-
   const weekdayLabels = useMemo(
     () =>
       Array.from({ length: gridColumns }, (_, index) => weekdayShort[index % 7]),
@@ -600,7 +567,6 @@ export default function YearlyPlanner({ year = 2026 }: { year?: number }) {
     () => new Map(spannedEvents.map((event) => [event.id, event])),
     [spannedEvents],
   )
-
   return (
     <section className="relative w-full overflow-visible rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
