@@ -15,6 +15,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 type PlannerEvent = {
   id: string | number
@@ -74,6 +78,20 @@ const toneStyles: Record<PlannerEvent["tone"], string> = {
 }
 
 const toneOrder: PlannerEvent["tone"][] = ["sea", "sunset", "orchid", "ink"]
+
+const tonePolaroidBackground: Record<PlannerEvent["tone"], string> = {
+  sea: "#1b6c7a",
+  sunset: "#e66a3b",
+  orchid: "#8a4b87",
+  ink: "#1f2937",
+}
+
+const tonePolaroidText: Record<PlannerEvent["tone"], string> = {
+  sea: "#ffffff",
+  sunset: "#ffffff",
+  orchid: "#ffffff",
+  ink: "#ffffff",
+}
 
 const createPolaroidImage = (label: string, hue: number) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
@@ -188,45 +206,77 @@ function formatEventRange(event: PlannerEvent) {
   return `${startMonth} ${start.getDate()}–${endMonth} ${end.getDate()}`
 }
 
-function VisionTooltipContent({ event }: { event: VisionEvent }) {
-  return (
-    <div className="relative">
-      <div className="absolute -bottom-2 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white/95 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.9)]" />
-      <div className="rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_30px_60px_-40px_rgba(15,23,42,0.9)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-          Vision board
-        </p>
-        <p className="mt-1 text-sm font-semibold text-slate-900">
-          {event.label}
-        </p>
-        <div className="relative mt-3 h-[150px]">
-          {event.images.slice(0, 3).map((image, imageIndex) => (
+function splitEventLabel(label: string) {
+  const trimmed = label.trim()
+  if (!trimmed) {
+    return { emoji: "", text: "" }
+  }
+  const first = Array.from(trimmed)[0] ?? ""
+  const isEmoji = first ? /\p{Extended_Pictographic}/u.test(first) : false
+  if (!isEmoji) {
+    return { emoji: "", text: trimmed }
+  }
+  const text = trimmed.slice(first.length).trim()
+  return { emoji: first, text: text || trimmed }
+}
+
+const polaroidStyle = {
+  content: (event: VisionEvent) => {
+    const { emoji, text } = splitEventLabel(event.label)
+    return (
+      <div className="relative h-[260px] min-w-[280px] overflow-visible sm:h-[320px] sm:min-w-[380px]">
+        {event.images.slice(0, 3).map((image, imageIndex) => (
+          <div
+            key={image}
+            className="absolute left-1/2 top-0 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            style={{
+              transform: `translate(${imageIndex * 40 - 44}px, ${
+                imageIndex * 16
+              }px) rotate(${imageIndex === 0 ? -4 : imageIndex === 1 ? 5 : -8}deg)`,
+              zIndex: 3 - imageIndex,
+              transitionDelay: `${imageIndex * 40}ms`,
+            }}
+          >
             <div
-              key={image}
-              className="absolute left-1/2 top-0 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-              style={{
-                transform: `translate(${imageIndex * 28 - 28}px, ${
-                  imageIndex * 10
-                }px) rotate(${imageIndex % 2 === 0 ? -6 : 5}deg)`,
-                zIndex: 3 - imageIndex,
-                transitionDelay: `${imageIndex * 40}ms`,
-              }}
+              className="relative w-[240px] rounded-2xl border border-white/50 px-3 pb-9 pt-3 shadow-[0_26px_56px_-32px_rgba(15,23,42,0.75)] sm:w-[320px]"
+              style={{ backgroundColor: tonePolaroidBackground[event.tone] }}
             >
-              <div className="w-[120px] rounded-lg border border-slate-200 bg-white p-2 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.8)]">
-                <div className="aspect-[3/4] overflow-hidden rounded-md bg-slate-100">
-                  <img
-                    src={image}
-                    alt={`${event.label} vision`}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="mt-2 h-3 w-2/3 rounded-full bg-slate-200/80" />
+              <span className="absolute -top-3 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[-6deg] rounded-[6px] bg-amber-100/90 shadow-[0_6px_14px_-10px_rgba(15,23,42,0.6)]" />
+            <div className="aspect-[4/3] overflow-hidden rounded-xl">
+              <img
+                src={image}
+                alt={`${event.label} vision`}
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+              <div
+                className="mt-2 flex flex-col items-center text-center"
+                style={{
+                  color: tonePolaroidText[event.tone],
+                  fontFamily: "'Permanent Marker', 'Comic Sans MS', cursive",
+                }}
+              >
+                {emoji ? (
+                  <span className="text-[24px] leading-none sm:text-[28px]">
+                    {emoji}
+                  </span>
+                ) : null}
+                <span className="line-clamp-2 text-[15px] font-semibold leading-tight sm:text-[16px]">
+                  {text}
+                </span>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    </div>
+    )
+  },
+}
+
+function VisionTooltipContent({ event }: { event: VisionEvent }) {
+  const variant = polaroidStyle
+  return (
+    <div className="relative overflow-visible">{variant.content(event)}</div>
   )
 }
 
@@ -268,7 +318,11 @@ function EventPill({
       <TooltipContent
         side="top"
         sideOffset={12}
-        className="border-0 bg-transparent p-0 shadow-none"
+        align="center"
+        collisionPadding={32}
+        avoidCollisions
+        sticky="always"
+        className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
         hideArrow
       >
         <VisionTooltipContent event={event} />
@@ -717,7 +771,11 @@ export default function YearlyPlanner({
                         <TooltipContent
                           side="top"
                           sideOffset={12}
-                          className="border-0 bg-transparent p-0 shadow-none"
+                          align="center"
+                          collisionPadding={32}
+                          avoidCollisions
+                          sticky="always"
+                          className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
                           hideArrow
                         >
                           <VisionTooltipContent event={segmentEvent} />
@@ -806,99 +864,112 @@ export default function YearlyPlanner({
         <span className="text-2xl leading-none">+</span>
       </button>
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="w-full max-w-md">
-          <SheetHeader>
-            <SheetTitle className="text-lg font-semibold text-slate-900">
-              Add vision
-            </SheetTitle>
-            <SheetDescription className="text-sm text-slate-500">
-              Capture the moment and attach imagery for quick hover previews.
-            </SheetDescription>
-          </SheetHeader>
-          <form onSubmit={handleEventSubmit} className="mt-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Title
-              </label>
-              <input
-                value={eventTitle}
-                onChange={(event) => setEventTitle(event.target.value)}
-                placeholder="Vision title"
-                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-              />
+        <SheetContent side="right" className="w-full max-w-md p-0">
+          <div className="flex h-full flex-col">
+            <div className="border-b border-slate-200/70 bg-slate-50/80 px-6 py-6">
+              <SheetHeader className="space-y-2">
+                <SheetTitle className="text-xl font-semibold text-slate-900">
+                  Add vision
+                </SheetTitle>
+                <SheetDescription className="text-sm text-slate-600">
+                  Capture the moment and attach imagery for quick hover previews.
+                </SheetDescription>
+              </SheetHeader>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Emoji
-              </label>
-              <input
-                value={eventEmoji}
-                onChange={(event) => setEventEmoji(event.target.value)}
-                placeholder="✨"
-                maxLength={4}
-                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Start date
-                </label>
-                <input
-                  type="date"
-                  value={eventStart}
-                  onChange={(event) => setEventStart(event.target.value)}
-                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  End date
-                </label>
-                <input
-                  type="date"
-                  value={eventEnd}
-                  onChange={(event) => setEventEnd(event.target.value)}
-                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Images
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageChange}
-                className="w-full text-sm text-slate-600 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-white"
-              />
-              {eventImages.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {eventImages.map((image) => (
-                    <div
-                      key={image}
-                      className="h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
-                    >
-                      <img
-                        src={image}
-                        alt="Vision upload preview"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitDisabled}
-              className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            <form
+              onSubmit={handleEventSubmit}
+              className="flex-1 space-y-6 px-6 py-6"
             >
-              Save vision
-            </button>
-          </form>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Title
+                </Label>
+                <Input
+                  value={eventTitle}
+                  onChange={(event) => setEventTitle(event.target.value)}
+                  placeholder="Vision title"
+                  className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Emoji
+                </Label>
+                <Input
+                  value={eventEmoji}
+                  onChange={(event) => setEventEmoji(event.target.value)}
+                  placeholder="✨"
+                  maxLength={4}
+                  className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Start date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={eventStart}
+                    onChange={(event) => setEventStart(event.target.value)}
+                    className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    End date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={eventEnd}
+                    onChange={(event) => setEventEnd(event.target.value)}
+                    className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  />
+                </div>
+              </div>
+              <Separator className="bg-slate-200/70" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Images
+                  </Label>
+                  <span className="text-xs text-slate-400">
+                    Optional, up to 6
+                  </span>
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="h-11 cursor-pointer bg-white text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-white"
+                />
+                {eventImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {eventImages.map((image) => (
+                      <div
+                        key={image}
+                        className="h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-[0_10px_20px_-16px_rgba(15,23,42,0.6)]"
+                      >
+                        <img
+                          src={image}
+                          alt="Vision upload preview"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="submit"
+                disabled={isSubmitDisabled}
+                className="h-12 w-full rounded-full text-xs font-semibold uppercase tracking-[0.3em]"
+              >
+                Save vision
+              </Button>
+            </form>
+          </div>
         </SheetContent>
       </Sheet>
     </>

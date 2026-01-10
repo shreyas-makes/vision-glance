@@ -23,7 +23,7 @@ export default function Dashboard({ events }: DashboardProps) {
       <Head title="Dashboard">
         <link rel="preconnect" href="https://fonts.bunny.net" />
         <link
-          href="https://fonts.bunny.net/css?family=fraunces:400,600|jetbrains-mono:400,600|space-grotesk:400,600"
+          href="https://fonts.bunny.net/css?family=permanent-marker:400|fraunces:400,600|jetbrains-mono:400,600|space-grotesk:400,600"
           rel="stylesheet"
         />
       </Head>
