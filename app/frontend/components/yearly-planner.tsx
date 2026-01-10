@@ -373,6 +373,7 @@ export default function YearlyPlanner({
   const [gridColumns, setGridColumns] = useState(7)
   const [gridCellSize, setGridCellSize] = useState(56)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"calendar" | "vision">("calendar")
   const [eventTitle, setEventTitle] = useState("")
   const [eventEmoji, setEventEmoji] = useState("")
   const [eventStart, setEventStart] = useState("")
@@ -715,6 +716,11 @@ export default function YearlyPlanner({
     () => new Map(spannedEvents.map((event) => [event.id, event])),
     [spannedEvents],
   )
+  const sortedVisionEvents = useMemo(() => {
+    return [...spannedEvents].sort(
+      (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+    )
+  }, [spannedEvents])
   return (
     <>
       <section className="relative w-full overflow-visible px-4 py-6 sm:px-8 sm:py-10">
@@ -741,205 +747,329 @@ export default function YearlyPlanner({
             {heroCTA ? (
               <div className="mt-6 w-full max-w-xl">{heroCTA}</div>
             ) : null}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
-                Shortcuts
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
-                    ←
-                  </kbd>
-                  <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
-                    →
-                  </kbd>
-                </div>
-                <span className="text-[11px] text-slate-500">Switch years</span>
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/90 p-1 text-xs font-semibold text-slate-600 shadow-[0_12px_24px_-18px_rgba(15,23,42,0.5)]"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setViewMode("calendar")}
+                  aria-pressed={viewMode === "calendar"}
+                  className={`rounded-full px-4 py-2 transition ${
+                    viewMode === "calendar"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Calendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("vision")}
+                  aria-pressed={viewMode === "vision"}
+                  className={`rounded-full px-4 py-2 transition ${
+                    viewMode === "vision"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Vision board
+                </button>
               </div>
+              {viewMode === "calendar" ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
+                    Shortcuts
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                      ←
+                    </kbd>
+                    <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                      →
+                    </kbd>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Switch years
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500">
+                  Collect visuals and map them to dates.
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         <div className="relative z-10 mt-8 space-y-4">
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p
-                  className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  Year flow
-                </p>
-                <p className="text-xs text-slate-400">
-                  {daysInYear} days · {spannedEvents.length} events
-                </p>
-              </div>
-              <div />
-            </div>
-
-            <div className="mt-3" ref={yearGridRef}>
-              <p className="sr-only" id="year-flow-label">
-                Year grid with day links. Use the jump menu to highlight dates.
-              </p>
-              <div
-                className="grid gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400"
-                style={{
-                  gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                }}
-              >
-                {weekdayLabels.map((day, index) => (
-                  <div key={`${day}-${index}`} className="text-center">
-                    {day}
-                  </div>
-                ))}
+          {viewMode === "calendar" ? (
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p
+                    className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    Year flow
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {daysInYear} days · {spannedEvents.length} events
+                  </p>
+                </div>
+                <div />
               </div>
 
-              <div className="relative mt-2">
+              <div className="mt-3" ref={yearGridRef}>
+                <p className="sr-only" id="year-flow-label">
+                  Year grid with day links. Use the jump menu to highlight dates.
+                </p>
                 <div
-                  className="pointer-events-none absolute inset-0 z-10 grid gap-1.5"
+                  className="grid gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400"
                   style={{
                     gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                    gridTemplateRows: weekRowHeights.join(" "),
                   }}
                 >
-                  {yearWeekSegments.segments.map((segment, index) => {
-                    const segmentEvent = eventById.get(segment.id)
-                    const hasImages =
-                      segmentEvent && segmentEvent.images.length > 0
-                    const segmentPill = (
-                      <div
-                        className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
-                          segmentEvent ? "cursor-pointer" : ""
-                        }`}
-                        style={{
-                          gridRow: segment.row,
-                          gridColumn: `${segment.colStart} / span ${segment.span}`,
-                          marginTop:
-                            segment.stackIndex *
-                            (yearEventRowHeight + yearEventRowGap),
-                        }}
-                        tabIndex={segmentEvent ? 0 : undefined}
-                        role={segmentEvent ? "button" : undefined}
-                        onClick={
-                          segmentEvent
-                            ? () => openEditSheet(segmentEvent)
-                            : undefined
-                        }
-                        onKeyDown={
-                          segmentEvent
-                            ? (eventKey) => {
-                                if (
-                                  eventKey.key === "Enter" ||
-                                  eventKey.key === " "
-                                ) {
-                                  eventKey.preventDefault()
-                                  openEditSheet(segmentEvent)
-                                }
-                              }
-                            : undefined
-                        }
-                      >
-                        <span className="truncate">{segment.label}</span>
-                      </div>
-                    )
+                  {weekdayLabels.map((day, index) => (
+                    <div key={`${day}-${index}`} className="text-center">
+                      {day}
+                    </div>
+                  ))}
+                </div>
 
-                    if (!segmentEvent || !hasImages) {
-                      return (
-                        <div key={`${segment.id}-year-${index}`}>
-                          {segmentPill}
+                <div className="relative mt-2">
+                  <div
+                    className="pointer-events-none absolute inset-0 z-10 grid gap-1.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                      gridTemplateRows: weekRowHeights.join(" "),
+                    }}
+                  >
+                    {yearWeekSegments.segments.map((segment, index) => {
+                      const segmentEvent = eventById.get(segment.id)
+                      const hasImages =
+                        segmentEvent && segmentEvent.images.length > 0
+                      const segmentPill = (
+                        <div
+                          className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
+                            segmentEvent ? "cursor-pointer" : ""
+                          }`}
+                          style={{
+                            gridRow: segment.row,
+                            gridColumn: `${segment.colStart} / span ${segment.span}`,
+                            marginTop:
+                              segment.stackIndex *
+                              (yearEventRowHeight + yearEventRowGap),
+                          }}
+                          tabIndex={segmentEvent ? 0 : undefined}
+                          role={segmentEvent ? "button" : undefined}
+                          onClick={
+                            segmentEvent
+                              ? () => openEditSheet(segmentEvent)
+                              : undefined
+                          }
+                          onKeyDown={
+                            segmentEvent
+                              ? (eventKey) => {
+                                  if (
+                                    eventKey.key === "Enter" ||
+                                    eventKey.key === " "
+                                  ) {
+                                    eventKey.preventDefault()
+                                    openEditSheet(segmentEvent)
+                                  }
+                                }
+                              : undefined
+                          }
+                        >
+                          <span className="truncate">{segment.label}</span>
                         </div>
                       )
+
+                      if (!segmentEvent || !hasImages) {
+                        return (
+                          <div key={`${segment.id}-year-${index}`}>
+                            {segmentPill}
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <Tooltip key={`${segment.id}-year-${index}`}>
+                          <TooltipTrigger asChild>{segmentPill}</TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            sideOffset={12}
+                            align="center"
+                            collisionPadding={32}
+                            avoidCollisions
+                            sticky="always"
+                            className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
+                            hideArrow
+                          >
+                            <VisionTooltipContent event={segmentEvent} />
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                    })}
+                  </div>
+
+                  <div
+                    className="relative z-0 grid gap-1.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                      gridTemplateRows: weekRowHeights.join(" "),
+                    }}
+                    role="grid"
+                    aria-labelledby="year-flow-label"
+                    aria-owns={
+                      yearDayIds.length > 0 ? yearDayIds.join(" ") : undefined
                     }
-
-                    return (
-                      <Tooltip key={`${segment.id}-year-${index}`}>
-                        <TooltipTrigger asChild>{segmentPill}</TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          sideOffset={12}
-                          align="center"
-                          collisionPadding={32}
-                          avoidCollisions
-                          sticky="always"
-                          className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
-                          hideArrow
-                        >
-                          <VisionTooltipContent event={segmentEvent} />
-                        </TooltipContent>
-                      </Tooltip>
-                    )
-                  })}
-                </div>
-
-                <div
-                  className="relative z-0 grid gap-1.5"
-                  style={{
-                    gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                    gridTemplateRows: weekRowHeights.join(" "),
-                  }}
-                  role="grid"
-                  aria-labelledby="year-flow-label"
-                  aria-owns={
-                    yearDayIds.length > 0 ? yearDayIds.join(" ") : undefined
-                  }
-                >
-                  {yearGrid.map((day, index) => {
-                    if (!day) {
+                  >
+                    {yearGrid.map((day, index) => {
+                      if (!day) {
+                        return (
+                          <div
+                            key={`year-pad-${index}`}
+                            className="h-full rounded-md bg-transparent"
+                          />
+                        )
+                      }
+                      const dayKey = formatDateKey(day.date)
                       return (
                         <div
-                          key={`year-pad-${index}`}
-                          className="h-full rounded-md bg-transparent"
-                        />
-                      )
-                    }
-                    const dayKey = formatDateKey(day.date)
-                    return (
-                      <div
-                        id={`year-day-${dayKey}`}
-                        key={`${day.date.toISOString()}-mobile-year`}
-                        role="gridcell"
-                        aria-label={`${monthNames[day.monthIndex]} ${
-                          day.dayNumber
-                        }, ${activeYear}`}
-                        className={[
-                          "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
-                          day.isWeekend
-                            ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
-                            : "",
-                        ].join(" ")}
-                        style={{ paddingTop: yearEventOffset }}
-                      >
-                        {day.isMonthStart && (
-                          <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
-                            {monthNames[day.monthIndex].slice(0, 3)}
-                          </span>
-                        )}
-                        <span
-                          className="mt-4 block text-[12px] font-semibold text-slate-900"
-                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                          id={`year-day-${dayKey}`}
+                          key={`${day.date.toISOString()}-mobile-year`}
+                          role="gridcell"
+                          aria-label={`${monthNames[day.monthIndex]} ${
+                            day.dayNumber
+                          }, ${activeYear}`}
+                          className={[
+                            "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
+                            day.isWeekend
+                              ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
+                              : "",
+                          ].join(" ")}
+                          style={{ paddingTop: yearEventOffset }}
                         >
-                          {day.dayNumber}
-                        </span>
-                      </div>
-                    )
-                  })}
+                          {day.isMonthStart && (
+                            <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
+                              {monthNames[day.monthIndex].slice(0, 3)}
+                            </span>
+                          )}
+                          <span
+                            className="mt-4 block text-[12px] font-semibold text-slate-900"
+                            style={{
+                              fontFamily: "'JetBrains Mono', monospace",
+                            }}
+                          >
+                            {day.dayNumber}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-              {spannedEvents.map((event) => (
-                <EventPill
-                  key={`${event.id}-mobile-pill`}
-                  event={event}
-                  pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
-                  labelClassName="font-semibold text-slate-800"
-                  rangeClassName="text-slate-500"
-                  onSelect={openEditSheet}
-                />
-              ))}
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                {spannedEvents.map((event) => (
+                  <EventPill
+                    key={`${event.id}-mobile-pill`}
+                    event={event}
+                    pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
+                    labelClassName="font-semibold text-slate-800"
+                    rangeClassName="text-slate-500"
+                    onSelect={openEditSheet}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-6 shadow-[0_30px_70px_-50px_rgba(15,23,42,0.6)] sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p
+                    className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    Vision board
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Pin the imagery, then anchor it to the calendar.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                    {sortedVisionEvents.length} visions
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
+                    {activeYear}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6 columns-1 gap-5 sm:columns-2 lg:columns-3">
+                {sortedVisionEvents.map((event) => {
+                  const previewImages = event.images.slice(0, 4)
+                  const imageGridCols =
+                    previewImages.length <= 1 ? "grid-cols-1" : "grid-cols-2"
+                  return (
+                    <div
+                      key={`${event.id}-vision-card`}
+                      className="relative mb-5 break-inside-avoid overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]"
+                    >
+                      <div
+                        className="absolute inset-0 opacity-70"
+                        style={{
+                          background: `linear-gradient(140deg, ${tonePolaroidBackground[event.tone]}22, transparent 55%)`,
+                        }}
+                      />
+                      <div className="relative space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {event.label}
+                          </p>
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`}
+                            aria-hidden="true"
+                          />
+                        </div>
+
+                        {previewImages.length > 0 ? (
+                          <div className={`grid gap-2 ${imageGridCols}`}>
+                            {previewImages.map((image, index) => (
+                              <div
+                                key={`${event.id}-vision-image-${image}`}
+                                className={`overflow-hidden rounded-2xl border border-white/60 shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] ${
+                                  previewImages.length === 1
+                                    ? "aspect-[4/3]"
+                                    : index === 0
+                                      ? "aspect-[4/3]"
+                                      : "aspect-square"
+                                }`}
+                              >
+                                <img
+                                  src={image}
+                                  alt={`${event.label} vision`}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-xs text-slate-500">
+                            Add imagery to bring this vision to life.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </section>
       <button
