@@ -10,11 +10,13 @@ import {
 
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -92,6 +94,13 @@ const tonePolaroidText: Record<PlannerEvent["tone"], string> = {
   sunset: "#ffffff",
   orchid: "#ffffff",
   ink: "#ffffff",
+}
+
+const toneLabels: Record<PlannerEvent["tone"], string> = {
+  sea: "Deep sea",
+  sunset: "Burnt sunset",
+  orchid: "Night orchid",
+  ink: "Midnight ink",
 }
 
 const createPolaroidImage = (label: string, hue: number) => {
@@ -391,6 +400,7 @@ export default function YearlyPlanner({
   const [eventEnd, setEventEnd] = useState("")
   const [eventImages, setEventImages] = useState<string[]>([])
   const [eventDescription, setEventDescription] = useState("")
+  const [eventTone, setEventTone] = useState<PlannerEvent["tone"]>("sea")
   const [useSampleEvents, setUseSampleEvents] = useState(!eventsProp)
   const [events, setEvents] = useState<VisionEvent[]>(
     eventsProp ?? createSampleEventsForYear(year),
@@ -471,6 +481,7 @@ export default function YearlyPlanner({
     setEventEnd("")
     setEventImages([])
     setEventDescription("")
+    setEventTone(toneOrder[events.length % toneOrder.length] ?? "sea")
   }
 
   const openCreateSheet = () => {
@@ -489,6 +500,7 @@ export default function YearlyPlanner({
     setEventEnd(event.end)
     setEventImages(event.images)
     setEventDescription(event.description ?? "")
+    setEventTone(event.tone)
     setIsSheetOpen(true)
   }
 
@@ -678,14 +690,12 @@ export default function YearlyPlanner({
       startDate.getTime() <= endDate.getTime() ? startDate : endDate
     const end =
       startDate.getTime() <= endDate.getTime() ? endDate : startDate
-    const tone = toneOrder[events.length % toneOrder.length]
     const label = `${eventEmoji.trim()} ${eventTitle.trim()}`.trim()
-    const existingEvent = events.find((item) => item.id === editingEventId)
     const payload: EventPayload = {
       label,
       start: formatDateKey(start),
       end: formatDateKey(end),
-      tone: existingEvent?.tone ?? tone,
+      tone: eventTone,
       images: eventImages,
       description: eventDescription.trim(),
     }
@@ -1092,23 +1102,41 @@ export default function YearlyPlanner({
         <span className="text-2xl leading-none">+</span>
       </button>
       <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
-      <SheetContent side="right" className="w-full max-w-md overflow-hidden p-0">
+        <SheetContent
+          side="right"
+          showClose={false}
+          className="w-full max-w-xl overflow-hidden p-0"
+        >
           <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 border-b border-slate-200/70 bg-slate-50/80 px-5 py-4">
-              <SheetHeader className="space-y-2">
-                <SheetTitle className="text-lg font-semibold text-slate-900">
-                  {editingEventId ? "Edit vision" : "Add vision"}
-                </SheetTitle>
-                <SheetDescription className="text-sm text-slate-600">
-                  Capture the moment and attach imagery for quick hover previews.
-                </SheetDescription>
+            <div className="shrink-0 border-b border-slate-200/70 bg-slate-50/80 px-6 py-4">
+              <SheetHeader className="space-y-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <SheetTitle className="text-lg font-semibold text-slate-900">
+                      {editingEventId ? "Edit vision" : "Add vision"}
+                    </SheetTitle>
+                    <SheetDescription className="text-sm text-slate-600">
+                      Capture the moment and attach imagery for quick hover previews.
+                    </SheetDescription>
+                  </div>
+                  <SheetClose asChild>
+                    <button
+                      type="button"
+                      className="rounded-md p-2 text-slate-400 transition hover:bg-white/70 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+                      aria-label="Close sidebar"
+                    >
+                      <XIcon className="size-4" />
+                    </button>
+                  </SheetClose>
+                </div>
               </SheetHeader>
             </div>
             <form
               onSubmit={handleEventSubmit}
-              className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-4"
+              className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="space-y-2">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Title
                 </Label>
@@ -1116,10 +1144,10 @@ export default function YearlyPlanner({
                   value={eventTitle}
                   onChange={(event) => setEventTitle(event.target.value)}
                   placeholder="Vision title"
-                  className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  className="h-9 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                 />
-              </div>
-              <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Vision details
                 </Label>
@@ -1127,11 +1155,11 @@ export default function YearlyPlanner({
                   value={eventDescription}
                   onChange={(event) => setEventDescription(event.target.value)}
                   placeholder="Describe the vision..."
-                  rows={3}
+                  rows={2}
                   className="w-full rounded-md border border-slate-200/70 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
                 />
-              </div>
-              <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Emoji
                 </Label>
@@ -1140,11 +1168,39 @@ export default function YearlyPlanner({
                   onChange={(event) => setEventEmoji(event.target.value)}
                   placeholder="✨"
                   maxLength={4}
-                  className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  className="h-9 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                 />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+                </div>
                 <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Tile color
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {toneOrder.map((tone) => (
+                    <button
+                      key={tone}
+                      type="button"
+                      onClick={() => setEventTone(tone)}
+                      className={[
+                        "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition",
+                        eventTone === tone
+                          ? "border-slate-900/50 bg-slate-900/5 text-slate-900 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.6)]"
+                          : "border-slate-200/70 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800",
+                      ].join(" ")}
+                    >
+                      <span
+                        className="h-4 w-4 rounded-full shadow-[0_6px_12px_-8px_rgba(15,23,42,0.7)]"
+                        style={{
+                          backgroundColor: tonePolaroidBackground[tone],
+                        }}
+                      />
+                      <span>{toneLabels[tone]}</span>
+                    </button>
+                  ))}
+                </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
                   <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Start date
                   </Label>
@@ -1152,10 +1208,10 @@ export default function YearlyPlanner({
                     type="date"
                     value={eventStart}
                     onChange={(event) => setEventStart(event.target.value)}
-                    className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                    className="h-9 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                   />
-                </div>
-                <div className="space-y-2">
+                  </div>
+                  <div className="space-y-2">
                   <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     End date
                   </Label>
@@ -1163,21 +1219,21 @@ export default function YearlyPlanner({
                     type="date"
                     value={eventEnd}
                     onChange={(event) => setEventEnd(event.target.value)}
-                    className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                    className="h-9 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                   />
+                  </div>
                 </div>
-              </div>
-              <Separator className="bg-slate-200/70" />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <Separator className="bg-slate-200/70" />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Images
                   </Label>
                   <span className="text-xs text-slate-400">
                     Optional, up to 6
                   </span>
-                </div>
-                <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8)] transition hover:border-slate-300">
+                  </div>
+                  <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8)] transition hover:border-slate-300">
                   <input
                     id="vision-images"
                     type="file"
@@ -1216,37 +1272,38 @@ export default function YearlyPlanner({
                       Choose
                     </span>
                   </label>
-                </div>
-                {eventImages.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-slate-500">
-                      {eventImages.length} image
-                      {eventImages.length === 1 ? "" : "s"} selected
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                    {eventImages.map((image) => (
-                      <div
-                        key={image}
-                        className="h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-[0_10px_20px_-16px_rgba(15,23,42,0.6)]"
-                      >
-                        <img
-                          src={image}
-                          alt="Vision upload preview"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ))}
-                    </div>
                   </div>
-                )}
+                  {eventImages.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-xs font-medium text-slate-500">
+                        {eventImages.length} image
+                        {eventImages.length === 1 ? "" : "s"} selected
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {eventImages.map((image) => (
+                          <div
+                            key={image}
+                            className="h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-[0_10px_20px_-16px_rgba(15,23,42,0.6)]"
+                          >
+                            <img
+                              src={image}
+                              alt="Vision upload preview"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isSubmitDisabled}
+                  className="mt-2 h-12 w-full rounded-full text-xs font-semibold uppercase tracking-[0.3em]"
+                >
+                  {editingEventId ? "Save changes" : "Save vision"}
+                </Button>
               </div>
-              <Button
-                type="submit"
-                disabled={isSubmitDisabled}
-                className="h-12 w-full rounded-full text-xs font-semibold uppercase tracking-[0.3em]"
-              >
-                {editingEventId ? "Save changes" : "Save vision"}
-              </Button>
             </form>
           </div>
         </SheetContent>
