@@ -225,15 +225,15 @@ const polaroidStyle = {
   content: (event: VisionEvent) => {
     const { emoji, text } = splitEventLabel(event.label)
     const previewImages = event.images.slice(0, 4)
-    const placements =
-      previewImages.length <= 1
-        ? [{ x: "-50%", y: "0px", rotate: 0 }]
-        : [
-            { x: "calc(var(--stack-spread) * -1)", y: "-6px", rotate: -6 },
-            { x: "calc(var(--stack-spread) * 0.2)", y: "6px", rotate: 5 },
-            { x: "calc(var(--stack-spread) * 1.15)", y: "32px", rotate: -3 },
-            { x: "calc(var(--stack-spread) * -0.1)", y: "82px", rotate: 8 },
-          ]
+    const isSingle = previewImages.length <= 1
+    const placements = isSingle
+      ? [{ x: "-50%", y: "0px", rotate: 0 }]
+      : [
+          { x: "calc(var(--stack-spread) * -1)", y: "-6px", rotate: -6 },
+          { x: "calc(var(--stack-spread) * 0.2)", y: "6px", rotate: 5 },
+          { x: "calc(var(--stack-spread) * 1.15)", y: "32px", rotate: -3 },
+          { x: "calc(var(--stack-spread) * -0.1)", y: "82px", rotate: 8 },
+        ]
     return (
       <div
         className="relative w-full max-w-[600px] overflow-visible"
@@ -254,7 +254,12 @@ const polaroidStyle = {
               return (
                 <div
                   key={`${event.id}-tooltip-image-${image}`}
-                  className="absolute left-1/2 top-1"
+                  className={
+                    isSingle
+                      ? "absolute left-1/2 bottom-0"
+                      : "absolute left-1/2 top-1"
+                  }
+                  data-polaroid-single={isSingle ? true : undefined}
                   style={{
                     width: "var(--stack-image)",
                     transform: isSingle
@@ -345,7 +350,7 @@ function EventPill({
         collisionPadding={32}
         avoidCollisions
         sticky="always"
-        className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
+        className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible data-[side=bottom]:[&_[data-polaroid-single]]:top-1 data-[side=bottom]:[&_[data-polaroid-single]]:bottom-auto"
         hideArrow
       >
         <VisionTooltipContent event={event} />
@@ -911,7 +916,7 @@ export default function YearlyPlanner({
                             collisionPadding={32}
                             avoidCollisions
                             sticky="always"
-                            className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible"
+                            className="border-0 bg-transparent p-0 shadow-none z-[120] overflow-visible data-[side=bottom]:[&_[data-polaroid-single]]:top-1 data-[side=bottom]:[&_[data-polaroid-single]]:bottom-auto"
                             hideArrow
                           >
                             <VisionTooltipContent event={segmentEvent} />
