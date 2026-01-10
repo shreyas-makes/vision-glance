@@ -224,53 +224,53 @@ function splitEventLabel(label: string) {
 const polaroidStyle = {
   content: (event: VisionEvent) => {
     const { emoji, text } = splitEventLabel(event.label)
+    const previewImages = event.images.slice(0, 4)
+    const placements = [
+      { x: "calc(var(--stack-spread) * -1)", y: "-6px", rotate: -6 },
+      { x: "calc(var(--stack-spread) * 0.2)", y: "6px", rotate: 5 },
+      { x: "calc(var(--stack-spread) * 1.15)", y: "32px", rotate: -3 },
+      { x: "calc(var(--stack-spread) * -0.1)", y: "82px", rotate: 8 },
+    ]
     return (
-      <div className="relative h-[260px] min-w-[280px] overflow-visible sm:h-[320px] sm:min-w-[380px]">
-        {event.images.slice(0, 3).map((image, imageIndex) => (
-          <div
-            key={image}
-            className="absolute left-1/2 top-0 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-            style={{
-              transform: `translate(${imageIndex * 40 - 44}px, ${
-                imageIndex * 16
-              }px) rotate(${imageIndex === 0 ? -4 : imageIndex === 1 ? 5 : -8}deg)`,
-              zIndex: 3 - imageIndex,
-              transitionDelay: `${imageIndex * 40}ms`,
-            }}
-          >
-            <div
-              className="relative w-[240px] rounded-2xl border border-white/50 px-3 pb-9 pt-3 shadow-[0_26px_56px_-32px_rgba(15,23,42,0.75)] sm:w-[320px]"
-              style={{ backgroundColor: tonePolaroidBackground[event.tone] }}
-            >
-              <span className="absolute -top-3 left-1/2 h-5 w-14 -translate-x-1/2 rotate-[-6deg] rounded-[6px] bg-amber-100/90 shadow-[0_6px_14px_-10px_rgba(15,23,42,0.6)]" />
-            <div className="aspect-[4/3] overflow-hidden rounded-xl">
-              <img
-                src={image}
-                alt={`${event.label} vision`}
-                className="h-full w-full object-cover object-center"
-              />
-            </div>
-              <div
-                className="mt-2 flex flex-col items-center text-center"
-                style={{
-                  color: tonePolaroidText[event.tone],
-                  fontFamily: "'Permanent Marker', 'Comic Sans MS', cursive",
-                  fontWeight: 400,
-                  letterSpacing: "0.02em",
-                }}
-              >
-                {emoji ? (
-                  <span className="text-[24px] leading-none sm:text-[28px]">
-                    {emoji}
-                  </span>
-                ) : null}
-                <span className="line-clamp-2 text-[15px] font-normal leading-snug sm:text-[16px]">
-                  {text}
-                </span>
-              </div>
-            </div>
+      <div
+        className="relative w-full max-w-[600px] overflow-visible"
+        style={
+          {
+            width: "min(92vw, 600px)",
+            "--stack-spread": "clamp(80px, 20vw, 140px)",
+            "--stack-image": "clamp(220px, 38vw, 320px)",
+            "--stack-height": "clamp(260px, 48vw, 340px)",
+          } as React.CSSProperties
+        }
+      >
+        <div className="relative px-2 pb-2 pt-2">
+          <div className="relative" style={{ height: "var(--stack-height)" }}>
+            {previewImages.map((image, index) => {
+              const placement = placements[index] ?? placements[0]
+              return (
+                <div
+                  key={`${event.id}-tooltip-image-${image}`}
+                  className="absolute left-1/2 top-1"
+                  style={{
+                    width: "var(--stack-image)",
+                    transform: `translate(${placement.x}, ${placement.y}) rotate(${placement.rotate}deg)`,
+                    zIndex: previewImages.length - index,
+                  }}
+                >
+                  <div className="overflow-hidden rounded-xl border border-white/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.6)]">
+                    <div className="aspect-[4/3]">
+                      <img
+                        src={image}
+                        alt={`${event.label} vision`}
+                        className="h-full w-full object-cover object-center"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        ))}
+        </div>
       </div>
     )
   },
@@ -1166,15 +1166,53 @@ export default function YearlyPlanner({
                     Optional, up to 6
                   </span>
                 </div>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageChange}
-                  className="h-11 cursor-pointer bg-white text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-semibold file:uppercase file:tracking-[0.2em] file:text-white"
-                />
+                <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8)] transition hover:border-slate-300">
+                  <input
+                    id="vision-images"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="sr-only"
+                  />
+                  <label
+                    htmlFor="vision-images"
+                    className="group flex cursor-pointer items-center gap-4 rounded-xl bg-white/70 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    <span className="flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-[0_8px_16px_-10px_rgba(15,23,42,0.4)]">
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="size-5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      >
+                        <path d="M4 16l4-4 4 4 4-4 4 4" />
+                        <path d="M20 16V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10" />
+                        <circle cx="9" cy="8" r="2" />
+                      </svg>
+                    </span>
+                    <span className="flex-1 space-y-1">
+                      <span className="block font-medium text-slate-900">
+                        Drop files or browse
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        JPG, PNG, or GIF. Max 6 images.
+                      </span>
+                    </span>
+                    <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-[0_8px_16px_-12px_rgba(15,23,42,0.6)] transition group-hover:translate-y-[-1px]">
+                      Choose
+                    </span>
+                  </label>
+                </div>
                 {eventImages.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-slate-500">
+                      {eventImages.length} image
+                      {eventImages.length === 1 ? "" : "s"} selected
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                     {eventImages.map((image) => (
                       <div
                         key={image}
@@ -1187,6 +1225,7 @@ export default function YearlyPlanner({
                         />
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
