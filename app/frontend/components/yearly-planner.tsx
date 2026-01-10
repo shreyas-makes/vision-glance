@@ -225,12 +225,15 @@ const polaroidStyle = {
   content: (event: VisionEvent) => {
     const { emoji, text } = splitEventLabel(event.label)
     const previewImages = event.images.slice(0, 4)
-    const placements = [
-      { x: "calc(var(--stack-spread) * -1)", y: "-6px", rotate: -6 },
-      { x: "calc(var(--stack-spread) * 0.2)", y: "6px", rotate: 5 },
-      { x: "calc(var(--stack-spread) * 1.15)", y: "32px", rotate: -3 },
-      { x: "calc(var(--stack-spread) * -0.1)", y: "82px", rotate: 8 },
-    ]
+    const placements =
+      previewImages.length <= 1
+        ? [{ x: "-50%", y: "0px", rotate: 0 }]
+        : [
+            { x: "calc(var(--stack-spread) * -1)", y: "-6px", rotate: -6 },
+            { x: "calc(var(--stack-spread) * 0.2)", y: "6px", rotate: 5 },
+            { x: "calc(var(--stack-spread) * 1.15)", y: "32px", rotate: -3 },
+            { x: "calc(var(--stack-spread) * -0.1)", y: "82px", rotate: 8 },
+          ]
     return (
       <div
         className="relative w-full max-w-[600px] overflow-visible"
@@ -238,8 +241,8 @@ const polaroidStyle = {
           {
             width: "min(92vw, 600px)",
             "--stack-spread": "clamp(80px, 20vw, 140px)",
-            "--stack-image": "clamp(220px, 38vw, 320px)",
-            "--stack-height": "clamp(260px, 48vw, 340px)",
+            "--stack-image": "clamp(312px, 50.4vw, 432px)",
+            "--stack-height": "clamp(360px, 62.4vw, 456px)",
           } as React.CSSProperties
         }
       >
@@ -247,22 +250,25 @@ const polaroidStyle = {
           <div className="relative" style={{ height: "var(--stack-height)" }}>
             {previewImages.map((image, index) => {
               const placement = placements[index] ?? placements[0]
+              const isSingle = previewImages.length <= 1
               return (
                 <div
                   key={`${event.id}-tooltip-image-${image}`}
                   className="absolute left-1/2 top-1"
                   style={{
                     width: "var(--stack-image)",
-                    transform: `translate(${placement.x}, ${placement.y}) rotate(${placement.rotate}deg)`,
+                    transform: isSingle
+                      ? `translate(${placement.x}, ${placement.y})`
+                      : `translate(${placement.x}, ${placement.y}) rotate(${placement.rotate}deg)`,
                     zIndex: previewImages.length - index,
                   }}
                 >
-                  <div className="overflow-hidden rounded-xl border border-white/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.6)]">
+                  <div className="overflow-hidden rounded-xl border border-white/80 bg-white shadow-[0_18px_40px_-24px_rgba(15,23,42,0.6)]">
                     <div className="aspect-[4/3]">
                       <img
                         src={image}
                         alt={`${event.label} vision`}
-                        className="h-full w-full object-cover object-center"
+                        className="block h-full w-full object-cover object-center"
                       />
                     </div>
                   </div>
@@ -1081,11 +1087,11 @@ export default function YearlyPlanner({
         <span className="text-2xl leading-none">+</span>
       </button>
       <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
-        <SheetContent side="right" className="w-full max-w-md p-0">
-          <div className="flex h-full flex-col">
-            <div className="border-b border-slate-200/70 bg-slate-50/80 px-6 py-6">
+      <SheetContent side="right" className="w-full max-w-md overflow-hidden p-0">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="shrink-0 border-b border-slate-200/70 bg-slate-50/80 px-5 py-4">
               <SheetHeader className="space-y-2">
-                <SheetTitle className="text-xl font-semibold text-slate-900">
+                <SheetTitle className="text-lg font-semibold text-slate-900">
                   {editingEventId ? "Edit vision" : "Add vision"}
                 </SheetTitle>
                 <SheetDescription className="text-sm text-slate-600">
@@ -1095,7 +1101,7 @@ export default function YearlyPlanner({
             </div>
             <form
               onSubmit={handleEventSubmit}
-              className="flex-1 space-y-6 px-6 py-6"
+              className="flex-1 min-h-0 space-y-4 overflow-y-auto px-5 py-4"
             >
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -1105,7 +1111,7 @@ export default function YearlyPlanner({
                   value={eventTitle}
                   onChange={(event) => setEventTitle(event.target.value)}
                   placeholder="Vision title"
-                  className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                 />
               </div>
               <div className="space-y-2">
@@ -1116,7 +1122,7 @@ export default function YearlyPlanner({
                   value={eventDescription}
                   onChange={(event) => setEventDescription(event.target.value)}
                   placeholder="Describe the vision..."
-                  rows={4}
+                  rows={3}
                   className="w-full rounded-md border border-slate-200/70 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
                 />
               </div>
@@ -1129,7 +1135,7 @@ export default function YearlyPlanner({
                   onChange={(event) => setEventEmoji(event.target.value)}
                   placeholder="✨"
                   maxLength={4}
-                  className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                  className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1141,7 +1147,7 @@ export default function YearlyPlanner({
                     type="date"
                     value={eventStart}
                     onChange={(event) => setEventStart(event.target.value)}
-                    className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                    className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1152,7 +1158,7 @@ export default function YearlyPlanner({
                     type="date"
                     value={eventEnd}
                     onChange={(event) => setEventEnd(event.target.value)}
-                    className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                    className="h-10 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
                   />
                 </div>
               </div>
@@ -1166,7 +1172,7 @@ export default function YearlyPlanner({
                     Optional, up to 6
                   </span>
                 </div>
-                <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8)] transition hover:border-slate-300">
+                <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8)] transition hover:border-slate-300">
                   <input
                     id="vision-images"
                     type="file"
@@ -1177,9 +1183,9 @@ export default function YearlyPlanner({
                   />
                   <label
                     htmlFor="vision-images"
-                    className="group flex cursor-pointer items-center gap-4 rounded-xl bg-white/70 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:bg-white"
+                    className="group flex cursor-pointer items-center gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm text-slate-600 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:bg-white"
                   >
-                    <span className="flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-[0_8px_16px_-10px_rgba(15,23,42,0.4)]">
+                    <span className="flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-[0_8px_16px_-10px_rgba(15,23,42,0.4)]">
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
@@ -1197,11 +1203,11 @@ export default function YearlyPlanner({
                       <span className="block font-medium text-slate-900">
                         Drop files or browse
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-[11px] text-slate-500">
                         JPG, PNG, or GIF. Max 6 images.
                       </span>
                     </span>
-                    <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-[0_8px_16px_-12px_rgba(15,23,42,0.6)] transition group-hover:translate-y-[-1px]">
+                    <span className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-[0_8px_16px_-12px_rgba(15,23,42,0.6)] transition group-hover:translate-y-[-1px]">
                       Choose
                     </span>
                   </label>
@@ -1216,7 +1222,7 @@ export default function YearlyPlanner({
                     {eventImages.map((image) => (
                       <div
                         key={image}
-                        className="h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-[0_10px_20px_-16px_rgba(15,23,42,0.6)]"
+                        className="h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-[0_10px_20px_-16px_rgba(15,23,42,0.6)]"
                       >
                         <img
                           src={image}
