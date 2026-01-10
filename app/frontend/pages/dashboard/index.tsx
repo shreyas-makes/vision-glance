@@ -19,7 +19,7 @@ export default function Dashboard({ events }: DashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/40 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-slate-50/40">
       <Head title="Dashboard">
         <link rel="preconnect" href="https://fonts.bunny.net" />
         <link
@@ -28,7 +28,7 @@ export default function Dashboard({ events }: DashboardProps) {
         />
       </Head>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col">
+      <div className="mx-auto flex w-full flex-col">
         <YearlyPlanner events={events} onCreateEvent={handleCreateEvent} />
       </div>
     </div>

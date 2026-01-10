@@ -519,7 +519,7 @@ export default function YearlyPlanner({
       : 0
 
   const weekRowHeights = useMemo(() => {
-    const dayCellHeight = Math.max(70, Math.round(gridCellSize * 2.5))
+    const dayCellHeight = Math.max(64, Math.round(gridCellSize * 2.3))
     const rowHeight = dayCellHeight + yearEventOffset
     return Array.from({ length: weekRows }, () => `${rowHeight}px`)
   }, [gridCellSize, weekRows, yearEventOffset])
@@ -595,205 +595,207 @@ export default function YearlyPlanner({
   )
   return (
     <>
-      <section className="relative w-full overflow-visible rounded-[28px] border border-white/70 bg-white/80 p-6 shadow-[0_40px_100px_-80px_rgba(12,24,37,0.8)] backdrop-blur sm:p-10">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
-        <div className="absolute -right-20 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(107,181,197,0.45),rgba(255,255,255,0))]" />
-        <div className="absolute -left-24 -bottom-32 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(242,183,141,0.45),rgba(255,255,255,0))]" />
-      </div>
+      <section className="relative w-full overflow-visible px-4 py-6 sm:px-8 sm:py-10">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -right-20 -top-32 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_center,rgba(107,181,197,0.45),rgba(255,255,255,0))]" />
+          <div className="absolute -left-24 -bottom-32 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(242,183,141,0.45),rgba(255,255,255,0))]" />
+        </div>
 
-      <div className="relative z-10">
-        <div className="flex flex-col items-center text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
-            Life Planner
-          </p>
-          <h1
-            className="mt-3 text-5xl font-semibold text-slate-950 sm:text-7xl lg:text-8xl"
-            style={{ fontFamily: "'Fraunces', serif" }}
-          >
-            {activeYear}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-            Your year ahead at a glance. Map out your vision board, directly on the calendar.
-          </p>
-          {heroCTA ? (
-            <div className="mt-6 w-full max-w-xl">{heroCTA}</div>
-          ) : null}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
-              Shortcuts
-            </span>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
-                  ←
-                </kbd>
-                <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
-                  →
-                </kbd>
+        <div className="relative z-10">
+          <div className="flex flex-col items-center text-center">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">
+              Life Planner
+            </p>
+            <h1
+              className="mt-3 text-5xl font-semibold text-slate-950 sm:text-7xl lg:text-8xl"
+              style={{ fontFamily: "'Fraunces', serif" }}
+            >
+              {activeYear}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
+              Your year ahead at a glance. Map out your vision board, directly
+              on the calendar.
+            </p>
+            {heroCTA ? (
+              <div className="mt-6 w-full max-w-xl">{heroCTA}</div>
+            ) : null}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
+                Shortcuts
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                    ←
+                  </kbd>
+                  <kbd className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-600 shadow-[0_8px_16px_-12px_rgba(15,23,42,0.7)]">
+                    →
+                  </kbd>
+                </div>
+                <span className="text-[11px] text-slate-500">Switch years</span>
               </div>
-              <span className="text-[11px] text-slate-500">Switch years</span>
             </div>
           </div>
         </div>
 
-      </div>
-
-      <div className="relative z-10 mt-8 space-y-4">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p
-                className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                Year flow
-              </p>
-              <p className="text-xs text-slate-400">
-                {daysInYear} days · {spannedEvents.length} events
-              </p>
-            </div>
-            <div />
-          </div>
-
-          <div className="mt-3" ref={yearGridRef}>
-            <p className="sr-only" id="year-flow-label">
-              Year grid with day links. Use the jump menu to highlight dates.
-            </p>
-            <div
-              className="grid gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400"
-              style={{
-                gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-              }}
-            >
-              {weekdayLabels.map((day, index) => (
-                <div key={`${day}-${index}`} className="text-center">
-                  {day}
-                </div>
-              ))}
+        <div className="relative z-10 mt-8 space-y-4">
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p
+                  className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  Year flow
+                </p>
+                <p className="text-xs text-slate-400">
+                  {daysInYear} days · {spannedEvents.length} events
+                </p>
+              </div>
+              <div />
             </div>
 
-            <div className="relative mt-2">
+            <div className="mt-3" ref={yearGridRef}>
+              <p className="sr-only" id="year-flow-label">
+                Year grid with day links. Use the jump menu to highlight dates.
+              </p>
               <div
-                className="pointer-events-none absolute inset-0 z-10 grid gap-1.5"
+                className="grid gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400"
                 style={{
                   gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                  gridTemplateRows: weekRowHeights.join(" "),
                 }}
               >
-                {yearWeekSegments.segments.map((segment, index) => {
-                  const segmentEvent = eventById.get(segment.id)
-                  const hasImages =
-                    segmentEvent && segmentEvent.images.length > 0
-                  const segmentPill = (
-                    <div
-                      className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
-                        hasImages ? "cursor-pointer" : ""
-                      }`}
-                      style={{
-                        gridRow: segment.row,
-                        gridColumn: `${segment.colStart} / span ${segment.span}`,
-                        marginTop:
-                          segment.stackIndex *
-                          (yearEventRowHeight + yearEventRowGap),
-                      }}
-                      tabIndex={hasImages ? 0 : undefined}
-                      role={hasImages ? "button" : undefined}
-                    >
-                      <span className="truncate">{segment.label}</span>
-                    </div>
-                  )
+                {weekdayLabels.map((day, index) => (
+                  <div key={`${day}-${index}`} className="text-center">
+                    {day}
+                  </div>
+                ))}
+              </div>
 
-                  if (!segmentEvent || !hasImages) {
-                    return (
-                      <div key={`${segment.id}-year-${index}`}>
-                        {segmentPill}
+              <div className="relative mt-2">
+                <div
+                  className="pointer-events-none absolute inset-0 z-10 grid gap-1.5"
+                  style={{
+                    gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                    gridTemplateRows: weekRowHeights.join(" "),
+                  }}
+                >
+                  {yearWeekSegments.segments.map((segment, index) => {
+                    const segmentEvent = eventById.get(segment.id)
+                    const hasImages =
+                      segmentEvent && segmentEvent.images.length > 0
+                    const segmentPill = (
+                      <div
+                        className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
+                          hasImages ? "cursor-pointer" : ""
+                        }`}
+                        style={{
+                          gridRow: segment.row,
+                          gridColumn: `${segment.colStart} / span ${segment.span}`,
+                          marginTop:
+                            segment.stackIndex *
+                            (yearEventRowHeight + yearEventRowGap),
+                        }}
+                        tabIndex={hasImages ? 0 : undefined}
+                        role={hasImages ? "button" : undefined}
+                      >
+                        <span className="truncate">{segment.label}</span>
                       </div>
                     )
+
+                    if (!segmentEvent || !hasImages) {
+                      return (
+                        <div key={`${segment.id}-year-${index}`}>
+                          {segmentPill}
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <Tooltip key={`${segment.id}-year-${index}`}>
+                        <TooltipTrigger asChild>{segmentPill}</TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          sideOffset={12}
+                          className="border-0 bg-transparent p-0 shadow-none"
+                          hideArrow
+                        >
+                          <VisionTooltipContent event={segmentEvent} />
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </div>
+
+                <div
+                  className="relative z-0 grid gap-1.5"
+                  style={{
+                    gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                    gridTemplateRows: weekRowHeights.join(" "),
+                  }}
+                  role="grid"
+                  aria-labelledby="year-flow-label"
+                  aria-owns={
+                    yearDayIds.length > 0 ? yearDayIds.join(" ") : undefined
                   }
-
-                  return (
-                    <Tooltip key={`${segment.id}-year-${index}`}>
-                      <TooltipTrigger asChild>{segmentPill}</TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        sideOffset={12}
-                        className="border-0 bg-transparent p-0 shadow-none"
-                        hideArrow
-                      >
-                        <VisionTooltipContent event={segmentEvent} />
-                      </TooltipContent>
-                    </Tooltip>
-                  )
-                })}
-              </div>
-
-              <div
-                className="relative z-0 grid gap-1.5"
-                style={{
-                  gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
-                  gridTemplateRows: weekRowHeights.join(" "),
-                }}
-                role="grid"
-                aria-labelledby="year-flow-label"
-                aria-owns={yearDayIds.length > 0 ? yearDayIds.join(" ") : undefined}
-              >
-                {yearGrid.map((day, index) => {
-                  if (!day) {
+                >
+                  {yearGrid.map((day, index) => {
+                    if (!day) {
+                      return (
+                        <div
+                          key={`year-pad-${index}`}
+                          className="h-full rounded-md bg-transparent"
+                        />
+                      )
+                    }
+                    const dayKey = formatDateKey(day.date)
                     return (
                       <div
-                        key={`year-pad-${index}`}
-                        className="h-full rounded-md bg-transparent"
-                      />
-                    )
-                  }
-                  const dayKey = formatDateKey(day.date)
-                  return (
-                    <div
-                      id={`year-day-${dayKey}`}
-                      key={`${day.date.toISOString()}-mobile-year`}
-                      role="gridcell"
-                      aria-label={`${monthNames[day.monthIndex]} ${
-                        day.dayNumber
-                      }, ${activeYear}`}
-                      className={[
-                        "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
-                        day.isWeekend
-                          ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
-                          : "",
-                      ].join(" ")}
-                      style={{ paddingTop: yearEventOffset }}
-                    >
-                      {day.isMonthStart && (
-                        <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
-                          {monthNames[day.monthIndex].slice(0, 3)}
-                        </span>
-                      )}
-                      <span
-                        className="mt-4 block text-[12px] font-semibold text-slate-900"
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                        id={`year-day-${dayKey}`}
+                        key={`${day.date.toISOString()}-mobile-year`}
+                        role="gridcell"
+                        aria-label={`${monthNames[day.monthIndex]} ${
+                          day.dayNumber
+                        }, ${activeYear}`}
+                        className={[
+                          "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
+                          day.isWeekend
+                            ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
+                            : "",
+                        ].join(" ")}
+                        style={{ paddingTop: yearEventOffset }}
                       >
-                        {day.dayNumber}
-                      </span>
-                    </div>
-                  )
-                })}
+                        {day.isMonthStart && (
+                          <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
+                            {monthNames[day.monthIndex].slice(0, 3)}
+                          </span>
+                        )}
+                        <span
+                          className="mt-4 block text-[12px] font-semibold text-slate-900"
+                          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                        >
+                          {day.dayNumber}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
-            {spannedEvents.map((event) => (
-              <EventPill
-                key={`${event.id}-mobile-pill`}
-                event={event}
-                pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
-                labelClassName="font-semibold text-slate-800"
-                rangeClassName="text-slate-500"
-              />
-            ))}
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">
+              {spannedEvents.map((event) => (
+                <EventPill
+                  key={`${event.id}-mobile-pill`}
+                  event={event}
+                  pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
+                  labelClassName="font-semibold text-slate-800"
+                  rangeClassName="text-slate-500"
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
       </section>
       <button
         type="button"
