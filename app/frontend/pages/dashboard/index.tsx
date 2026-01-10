@@ -6,7 +6,7 @@ import type { CalendarEvent } from "@/types"
 
 type EventPayload = Pick<
   CalendarEvent,
-  "label" | "start" | "end" | "tone" | "images"
+  "label" | "start" | "end" | "tone" | "images" | "description"
 >
 
 type DashboardProps = {

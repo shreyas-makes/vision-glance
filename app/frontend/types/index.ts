@@ -51,5 +51,6 @@ export interface CalendarEvent {
   end: string
   tone: "sea" | "sunset" | "orchid" | "ink"
   images: string[]
+  description?: string
   createdAt?: number
 }

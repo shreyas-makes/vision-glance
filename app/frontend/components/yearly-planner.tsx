@@ -31,6 +31,7 @@ type PlannerEvent = {
 
 type VisionEvent = PlannerEvent & {
   images: string[]
+  description?: string
 }
 
 type EventPayload = Omit<VisionEvent, "id" | "createdAt">
@@ -254,6 +255,8 @@ const polaroidStyle = {
                 style={{
                   color: tonePolaroidText[event.tone],
                   fontFamily: "'Permanent Marker', 'Comic Sans MS', cursive",
+                  fontWeight: 400,
+                  letterSpacing: "0.02em",
                 }}
               >
                 {emoji ? (
@@ -261,7 +264,7 @@ const polaroidStyle = {
                     {emoji}
                   </span>
                 ) : null}
-                <span className="line-clamp-2 text-[15px] font-semibold leading-tight sm:text-[16px]">
+                <span className="line-clamp-2 text-[15px] font-normal leading-snug sm:text-[16px]">
                   {text}
                 </span>
               </div>
@@ -286,19 +289,33 @@ function EventPill({
   labelClassName,
   rangeClassName,
   showRange = true,
+  onSelect,
 }: {
   event: VisionEvent
   pillClassName: string
   labelClassName?: string
   rangeClassName?: string
   showRange?: boolean
+  onSelect?: (event: VisionEvent) => void
 }) {
   const hasImages = event.images.length > 0
+  const isInteractive = Boolean(onSelect)
   const pill = (
     <div
-      className={`${pillClassName}${hasImages ? " cursor-pointer" : ""}`}
-      tabIndex={hasImages ? 0 : undefined}
-      role={hasImages ? "button" : undefined}
+      className={`${pillClassName}${isInteractive ? " cursor-pointer" : ""}`}
+      tabIndex={isInteractive ? 0 : undefined}
+      role={isInteractive ? "button" : undefined}
+      onClick={isInteractive ? () => onSelect?.(event) : undefined}
+      onKeyDown={
+        isInteractive
+          ? (eventKey) => {
+              if (eventKey.key === "Enter" || eventKey.key === " ") {
+                eventKey.preventDefault()
+                onSelect?.(event)
+              }
+            }
+          : undefined
+      }
     >
       <span className={`h-2.5 w-2.5 rounded-full ${toneStyles[event.tone]}`} />
       <span className={labelClassName}>{event.label}</span>
@@ -341,6 +358,7 @@ type YearlyPlannerProps = {
   year?: number
   events?: VisionEvent[]
   onCreateEvent?: (event: EventPayload) => void
+  onUpdateEvent?: (eventId: VisionEvent["id"], event: EventPayload) => void
   heroCTA?: ReactNode
 }
 
@@ -348,6 +366,7 @@ export default function YearlyPlanner({
   year = 2026,
   events: eventsProp,
   onCreateEvent,
+  onUpdateEvent,
   heroCTA,
 }: YearlyPlannerProps) {
   const [activeYear, setActiveYear] = useState(year)
@@ -359,10 +378,14 @@ export default function YearlyPlanner({
   const [eventStart, setEventStart] = useState("")
   const [eventEnd, setEventEnd] = useState("")
   const [eventImages, setEventImages] = useState<string[]>([])
+  const [eventDescription, setEventDescription] = useState("")
   const [useSampleEvents, setUseSampleEvents] = useState(!eventsProp)
   const [events, setEvents] = useState<VisionEvent[]>(
     eventsProp ?? createSampleEventsForYear(year),
   )
+  const [editingEventId, setEditingEventId] = useState<
+    VisionEvent["id"] | null
+  >(null)
   const yearGridRef = useRef<HTMLDivElement | null>(null)
   const isSubmitDisabled = !eventTitle.trim() || !eventStart || !eventEnd
 
@@ -428,6 +451,42 @@ export default function YearlyPlanner({
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [])
+
+  const resetForm = () => {
+    setEventTitle("")
+    setEventEmoji("")
+    setEventStart("")
+    setEventEnd("")
+    setEventImages([])
+    setEventDescription("")
+  }
+
+  const openCreateSheet = () => {
+    setEditingEventId(null)
+    resetForm()
+    setIsSheetOpen(true)
+  }
+
+  const openEditSheet = (event: VisionEvent) => {
+    const { emoji, text } = splitEventLabel(event.label)
+    setUseSampleEvents(false)
+    setEditingEventId(event.id)
+    setEventTitle(text)
+    setEventEmoji(emoji)
+    setEventStart(event.start)
+    setEventEnd(event.end)
+    setEventImages(event.images)
+    setEventDescription(event.description ?? "")
+    setIsSheetOpen(true)
+  }
+
+  const handleSheetOpenChange = (open: boolean) => {
+    setIsSheetOpen(open)
+    if (!open) {
+      setEditingEventId(null)
+      resetForm()
+    }
+  }
 
   const spannedEvents = useMemo(() => eventDates, [eventDates])
 
@@ -609,14 +668,26 @@ export default function YearlyPlanner({
       startDate.getTime() <= endDate.getTime() ? endDate : startDate
     const tone = toneOrder[events.length % toneOrder.length]
     const label = `${eventEmoji.trim()} ${eventTitle.trim()}`.trim()
+    const existingEvent = events.find((item) => item.id === editingEventId)
     const payload: EventPayload = {
       label,
       start: formatDateKey(start),
       end: formatDateKey(end),
-      tone,
+      tone: existingEvent?.tone ?? tone,
       images: eventImages,
+      description: eventDescription.trim(),
     }
-    if (onCreateEvent) {
+    if (editingEventId) {
+      if (onUpdateEvent) {
+        onUpdateEvent(editingEventId, payload)
+      } else {
+        setEvents((prev) =>
+          prev.map((item) =>
+            item.id === editingEventId ? { ...item, ...payload } : item,
+          ),
+        )
+      }
+    } else if (onCreateEvent) {
       onCreateEvent(payload)
     } else {
       setUseSampleEvents(false)
@@ -630,11 +701,8 @@ export default function YearlyPlanner({
         },
       ])
     }
-    setEventTitle("")
-    setEventEmoji("")
-    setEventStart("")
-    setEventEnd("")
-    setEventImages([])
+    setEditingEventId(null)
+    resetForm()
     setIsSheetOpen(false)
   }
 
@@ -741,7 +809,7 @@ export default function YearlyPlanner({
                     const segmentPill = (
                       <div
                         className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
-                          hasImages ? "cursor-pointer" : ""
+                          segmentEvent ? "cursor-pointer" : ""
                         }`}
                         style={{
                           gridRow: segment.row,
@@ -750,8 +818,26 @@ export default function YearlyPlanner({
                             segment.stackIndex *
                             (yearEventRowHeight + yearEventRowGap),
                         }}
-                        tabIndex={hasImages ? 0 : undefined}
-                        role={hasImages ? "button" : undefined}
+                        tabIndex={segmentEvent ? 0 : undefined}
+                        role={segmentEvent ? "button" : undefined}
+                        onClick={
+                          segmentEvent
+                            ? () => openEditSheet(segmentEvent)
+                            : undefined
+                        }
+                        onKeyDown={
+                          segmentEvent
+                            ? (eventKey) => {
+                                if (
+                                  eventKey.key === "Enter" ||
+                                  eventKey.key === " "
+                                ) {
+                                  eventKey.preventDefault()
+                                  openEditSheet(segmentEvent)
+                                }
+                              }
+                            : undefined
+                        }
                       >
                         <span className="truncate">{segment.label}</span>
                       </div>
@@ -849,6 +935,7 @@ export default function YearlyPlanner({
                   pillClassName="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1"
                   labelClassName="font-semibold text-slate-800"
                   rangeClassName="text-slate-500"
+                  onSelect={openEditSheet}
                 />
               ))}
             </div>
@@ -857,19 +944,19 @@ export default function YearlyPlanner({
       </section>
       <button
         type="button"
-        onClick={() => setIsSheetOpen(true)}
+        onClick={openCreateSheet}
         className="group fixed bottom-6 right-6 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_22px_48px_-24px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/60"
         aria-label="Add new vision"
       >
         <span className="text-2xl leading-none">+</span>
       </button>
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+      <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
         <SheetContent side="right" className="w-full max-w-md p-0">
           <div className="flex h-full flex-col">
             <div className="border-b border-slate-200/70 bg-slate-50/80 px-6 py-6">
               <SheetHeader className="space-y-2">
                 <SheetTitle className="text-xl font-semibold text-slate-900">
-                  Add vision
+                  {editingEventId ? "Edit vision" : "Add vision"}
                 </SheetTitle>
                 <SheetDescription className="text-sm text-slate-600">
                   Capture the moment and attach imagery for quick hover previews.
@@ -889,6 +976,18 @@ export default function YearlyPlanner({
                   onChange={(event) => setEventTitle(event.target.value)}
                   placeholder="Vision title"
                   className="h-11 bg-white text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:ring-slate-300/70"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Vision details
+                </Label>
+                <textarea
+                  value={eventDescription}
+                  onChange={(event) => setEventDescription(event.target.value)}
+                  placeholder="Describe the vision..."
+                  rows={4}
+                  className="w-full rounded-md border border-slate-200/70 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_0_0_1px_rgba(148,163,184,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
                 />
               </div>
               <div className="space-y-2">
@@ -966,7 +1065,7 @@ export default function YearlyPlanner({
                 disabled={isSubmitDisabled}
                 className="h-12 w-full rounded-full text-xs font-semibold uppercase tracking-[0.3em]"
               >
-                Save vision
+                {editingEventId ? "Save changes" : "Save vision"}
               </Button>
             </form>
           </div>
