@@ -640,8 +640,11 @@ export default function YearlyPlanner({
     [yearGrid],
   )
 
-  const yearEventRowHeight = 34
+  const yearEventRowHeight = 32
   const yearEventRowGap = 8
+
+  const todayDate = useMemo(() => new Date(), [])
+  const todayKey = useMemo(() => formatDateKey(todayDate), [todayDate])
 
   const maxEventStack = useMemo(
     () => Math.max(0, ...yearWeekSegments.maxStackByRow),
@@ -651,8 +654,7 @@ export default function YearlyPlanner({
   const yearEventOffset =
     maxEventStack > 0
       ? maxEventStack * yearEventRowHeight +
-        (maxEventStack - 1) * yearEventRowGap +
-        6
+        (maxEventStack - 1) * yearEventRowGap
       : 0
 
   const weekRowHeights = useMemo(() => {
@@ -871,9 +873,17 @@ export default function YearlyPlanner({
                       const segmentEvent = eventById.get(segment.id)
                       const hasImages =
                         segmentEvent && segmentEvent.images.length > 0
+                      const labelParts = segment.label.split(" ")
+                      const emojiToken = labelParts[0] ?? ""
+                      const hasEmoji = /\p{Extended_Pictographic}/u.test(
+                        emojiToken,
+                      )
+                      const labelText = hasEmoji
+                        ? labelParts.slice(1).join(" ")
+                        : segment.label
                       const segmentPill = (
                         <div
-                          className={`pointer-events-auto flex h-8 items-center self-start rounded-full px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
+                          className={`pointer-events-auto flex h-8 items-center self-start rounded-full border border-slate-900 px-4 text-[13px] font-semibold shadow-[0_16px_36px_-16px_rgba(15,23,42,0.9)] ${toneStyles[segment.tone]} ${
                             segmentEvent ? "cursor-pointer" : ""
                           }`}
                           style={{
@@ -881,7 +891,8 @@ export default function YearlyPlanner({
                             gridColumn: `${segment.colStart} / span ${segment.span}`,
                             marginTop:
                               segment.stackIndex *
-                              (yearEventRowHeight + yearEventRowGap),
+                                (yearEventRowHeight + yearEventRowGap) -
+                              2,
                           }}
                           tabIndex={segmentEvent ? 0 : undefined}
                           role={segmentEvent ? "button" : undefined}
@@ -904,7 +915,16 @@ export default function YearlyPlanner({
                               : undefined
                           }
                         >
-                          <span className="truncate">{segment.label}</span>
+                          {hasEmoji ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-[16px] drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
+                                {emojiToken}
+                              </span>
+                              <span className="truncate">{labelText}</span>
+                            </span>
+                          ) : (
+                            <span className="truncate">{segment.label}</span>
+                          )}
                         </div>
                       )
 
@@ -953,11 +973,15 @@ export default function YearlyPlanner({
                         return (
                           <div
                             key={`year-pad-${index}`}
-                            className="h-full rounded-md bg-transparent"
+                            className="h-full rounded-2xl bg-transparent"
                           />
                         )
                       }
                       const dayKey = formatDateKey(day.date)
+                      const isToday = dayKey === todayKey
+                      const dayPaddingTop = isToday
+                        ? Math.max(0, yearEventOffset - 2)
+                        : yearEventOffset
                       return (
                         <div
                           id={`year-day-${dayKey}`}
@@ -967,26 +991,41 @@ export default function YearlyPlanner({
                             day.dayNumber
                           }, ${activeYear}`}
                           className={[
-                            "relative h-full rounded-md border border-slate-200 bg-white px-2 text-left text-xs",
+                            "relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white px-2 text-left text-xs transition-transform",
                             day.isWeekend
                               ? "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200/80"
                               : "",
+                            isToday
+                              ? "border border-slate-900 bg-amber-50 shadow-[0_20px_44px_-22px_rgba(15,23,42,0.6)] -translate-y-0.5"
+                              : "",
                           ].join(" ")}
-                          style={{ paddingTop: yearEventOffset }}
+                          style={{ paddingTop: dayPaddingTop }}
                         >
+                          {isToday && (
+                            <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.3em] text-amber-200 shadow-[0_8px_20px_-12px_rgba(15,23,42,0.7)]">
+                              Today
+                            </span>
+                          )}
                           {day.isMonthStart && (
                             <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-white">
                               {monthNames[day.monthIndex].slice(0, 3)}
                             </span>
                           )}
                           <span
-                            className="mt-4 block text-[12px] font-semibold text-slate-900"
+                            className={`mt-4 block text-[12px] font-semibold text-slate-900 ${
+                              isToday ? "text-[20px] text-slate-950" : ""
+                            }`}
                             style={{
                               fontFamily: "'JetBrains Mono', monospace",
                             }}
                           >
                             {day.dayNumber}
                           </span>
+                          {isToday && (
+                            <span className="mt-1 block text-[10px] uppercase tracking-[0.28em] text-slate-500">
+                              {weekdayShort[day.date.getDay()]}
+                            </span>
+                          )}
                         </div>
                       )
                     })}
